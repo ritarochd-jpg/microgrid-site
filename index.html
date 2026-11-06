@@ -1,0 +1,1476 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Microgrid PV-batterie d'une maison de Casablanca : simulateur 24 h et résultats Simulink. Projet de Rita Rochd, génie électrique.">
+<title>Maison solaire en 24 heures</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Funnel+Display:wght@400..800&family=Funnel+Sans:wght@400..700&family=B612+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#F3F4F2; --panel:#FFFFFF; --ink:#16181B; --ink-2:#464B53; --muted:#5F656E; --line:#D5D7D4; --line-2:#E6E7E4; --sky:#E4E8EB; --wire:#5A6069;
+  --solar:#B06800; --battery:#0D7A67; --grid:#3E50C2; --genset:#BE4829; --shed:#A11D3A; --cloud:#8A9098; --lit:#E9B44C;
+  --f-head:"Funnel Display","Helvetica Neue",Arial,sans-serif;
+  --f-sans:"Funnel Sans","Helvetica Neue",Arial,sans-serif;
+  --f-mono:"B612 Mono",ui-monospace,Consolas,monospace;
+  --accent:#7A2E3B;
+  color-scheme:light;
+}
+:root[data-sky="night"]{
+  --bg:#0F1114; --panel:#171A1F; --ink:#ECEEF1; --ink-2:#B6BCC6; --muted:#949BA6; --line:#30353D; --line-2:#22262C; --sky:#141820; --wire:#9AA1AC;
+  --accent:#E39AA6; --solar:#F0AE4E; --battery:#4FCDB3; --grid:#99A6FF; --genset:#FF8A6B; --shed:#FF6F8A; --cloud:#6E7681; --lit:#F2C46A;
+  color-scheme:dark;
+}
+html[data-lang="fr"] [lang="en"],html[data-lang="en"] [lang="fr"]{display:none !important}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-sans);font-size:16px;line-height:1.5;font-variant-numeric:tabular-nums}
+button,select,input{font:inherit;color:inherit}
+.wrap{max-width:1320px;margin:0 auto;padding-block:20px 64px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:20px}
+.mono{font-family:var(--f-mono)}
+.wrap > *{min-width:0}
+
+.top{display:flex;justify-content:space-between;align-items:center;gap:10px 20px;flex-wrap:wrap;padding-bottom:12px;border-bottom:1px solid var(--line)}
+.who{font-family:var(--f-head);font-weight:650;font-size:17px}
+.who span{font-family:var(--f-sans);font-weight:400;color:var(--ink-2);font-size:14px;margin-left:8px}
+.nav{display:flex;flex-wrap:wrap;gap:2px 16px;align-items:center}
+.nav a{font-size:14px;color:var(--accent);text-decoration:none;padding:4px 0;border-bottom:1px solid transparent}
+.nav a:hover{border-color:var(--accent)}
+.langs{display:inline-flex;border:1px solid var(--line);border-radius:3px;overflow:hidden;margin-left:6px}
+.langs button{border:0;background:transparent;padding:4px 10px;font-size:13px;font-weight:600;cursor:pointer;color:var(--ink-2)}
+.langs button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+
+.desk{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;padding:8px 10px;border:1px solid var(--line);border-radius:4px;background:var(--panel)}
+.desk .grp{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.desk .sep{width:1px;height:26px;background:var(--line)}
+.clockbox{display:flex;align-items:baseline;gap:10px;margin-right:4px}
+.time{font-family:var(--f-mono);font-weight:400;font-size:26px;line-height:1;letter-spacing:-.02em}
+.day{font-size:13px;color:var(--ink-2)}
+.mode{font-size:13px;font-weight:600;display:inline-flex;gap:7px;align-items:center;padding:3px 9px;border:1px solid currentColor;border-radius:3px}
+.mode::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
+.btn{border:1px solid var(--line);background:transparent;padding:6px 12px;border-radius:3px;cursor:pointer;font-size:14px;font-weight:500;display:inline-flex;gap:7px;align-items:center;min-height:36px}
+.btn:hover{border-color:var(--ink-2)}
+.btn:focus-visible,.sel:focus-visible,.preset:focus-visible,.jl button:focus-visible,input:focus-visible,select:focus-visible,.nav a:focus-visible,.langs button:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.btn.play{background:var(--ink);color:var(--bg);border-color:var(--ink);min-width:104px;justify-content:center;font-weight:600}
+.btn[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.btn.cut[aria-pressed="true"]{background:var(--genset);border-color:var(--genset);color:#fff}
+.btn .sw{width:8px;height:8px;border-radius:50%}
+.sel{background:var(--panel);border:1px solid var(--line);padding:6px 8px;border-radius:3px;min-height:36px;font-size:14px}
+.kbd{font-size:12.5px;color:var(--muted)}
+@media (max-width:1500px){.kbd{display:none}}
+@media (max-width:640px){.desk .sep{display:none}.clockbox{width:100%}}
+
+.sheet{position:relative;border:1px solid var(--line);border-radius:4px;background:var(--panel)}
+.sheetscroll{overflow-x:auto}
+.sheet svg{display:block;width:100%;height:auto}
+#svg{min-width:660px}
+#svgM{display:none}
+#svgM .sv-t{font-size:13.5px}
+#svgM .sv-s{font-size:12.5px}
+#svgM .sv-m{font-size:13.5px}
+#svgM .sv-ms{font-size:12px}
+@media (max-width:699px){#svg{display:none}#svgM{display:block;max-width:440px;margin:0 auto}}
+
+.open{display:grid;gap:12px;padding-top:6px}
+.opentext{display:grid;gap:12px}
+.opentext{transition:opacity .7s ease,transform .7s ease}
+h1{font-family:var(--f-head);font-weight:650;color:var(--accent);font-size:clamp(34px,5vw,64px);line-height:1;letter-spacing:-.025em;margin:0;text-wrap:balance}
+.info{margin:14px 0 0;font-size:14.5px;color:var(--ink-2)}
+.lede{margin:0;max-width:68ch;color:var(--ink-2);font-size:17.5px;line-height:1.5}
+figcaption{font-size:13.5px;color:var(--ink-2);line-height:1.5;max-width:80ch}
+figcaption b{color:var(--ink);font-weight:650}
+figure{margin:0}
+
+.part{display:grid;grid-template-columns:auto minmax(0,1fr);gap:6px 20px;align-items:center;padding-top:40px;margin-top:8px}
+.part .mk{display:flex;align-items:center;gap:10px;color:var(--ink-2)}
+.part .mk svg{width:96px;height:34px;display:block}
+.part .mk span{font-family:var(--f-head);font-weight:700;font-size:22px;color:var(--accent)}
+.part h2{font-family:var(--f-head);font-weight:650;color:var(--accent);font-size:clamp(26px,3.2vw,40px);line-height:1.05;letter-spacing:-.01em;margin:0;text-wrap:balance}
+.part p{grid-column:2;margin:0;max-width:72ch;color:var(--ink-2)}
+@media (max-width:640px){.part{grid-template-columns:1fr}.part p{grid-column:1}}
+
+.panel{border:1px solid var(--line);border-radius:4px;background:var(--panel);padding:16px;display:grid;gap:10px;align-content:start;min-width:0}
+.h{font-size:14.5px;font-weight:650;margin:0;display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.h small{font-family:var(--f-mono);font-weight:400;font-size:12px;color:var(--muted)}
+.inst{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+@media (max-width:980px){.inst{grid-template-columns:1fr 1fr}}
+@media (max-width:640px){.inst{grid-template-columns:1fr}}
+.big{font-family:var(--f-mono);font-weight:700;font-size:46px;line-height:1;letter-spacing:-.03em}
+.big span{font-size:22px;color:var(--ink-2)}
+.socbar{position:relative;height:12px;background:var(--line-2);border:1px solid var(--line)}
+.socfill{position:absolute;inset:0 auto 0 0;background:var(--battery);width:50%}
+.socbar i{position:absolute;top:-4px;bottom:-4px;width:1px;background:var(--ink-2)}
+.socscale{font-family:var(--f-mono);font-size:11px;color:var(--muted);position:relative;height:13px}
+.socscale span{position:absolute;transform:translateX(-50%)}
+.kv{display:grid;grid-template-columns:1fr auto;gap:3px 10px;font-size:14px;margin:0}
+.kv dt{color:var(--ink-2)} .kv dd{margin:0;font-family:var(--f-mono);text-align:right}
+canvas{display:block;width:100%}
+.capt{font-size:13px;color:var(--ink-2);margin:0;min-height:2.9em}
+
+.tl{padding:16px 18px 14px}
+.tlhead{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px 20px;align-items:baseline}
+.legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:13px;color:var(--ink-2)}
+.legend span{display:inline-flex;gap:6px;align-items:center}
+.legend i{width:11px;height:11px;display:inline-block}
+#chart{height:250px;cursor:ew-resize;touch-action:none}
+.story{display:grid;grid-template-columns:auto 1fr;gap:4px 16px;align-items:baseline;border-top:1px solid var(--line-2);padding-top:10px}
+.story .t{font-family:var(--f-mono);font-weight:400;font-size:16px}
+.story p{margin:0;font-size:16.5px;max-width:90ch}
+.story .rule{grid-column:2;font-size:13.5px;color:var(--ink-2)}
+@media (max-width:640px){.story{grid-template-columns:1fr}.story .rule{grid-column:1}}
+
+.lower{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr) minmax(0,1fr);gap:16px;align-items:start}
+@media (max-width:1060px){.lower{grid-template-columns:1fr 1fr}}
+@media (max-width:700px){.lower{grid-template-columns:1fr}}
+.jl{list-style:none;margin:0;padding:0;display:grid;gap:1px;max-height:390px;overflow:auto}
+.jl button{all:unset;box-sizing:border-box;cursor:pointer;display:grid;grid-template-columns:58px 9px 1fr;gap:8px;align-items:baseline;padding:6px;width:100%;border-left:2px solid transparent}
+.jl button:hover{background:var(--line-2)}
+.jl .tt{font-family:var(--f-mono);font-size:12.5px;color:var(--ink-2)}
+.jl .dd{width:8px;height:8px;border-radius:50%;align-self:center}
+.jl .tx{font-size:14px}
+.jl li.future{opacity:.55}
+.jl li.now button{background:var(--line-2);border-left-color:var(--ink)}
+.presets{display:grid;gap:6px}
+.preset{all:unset;box-sizing:border-box;cursor:pointer;border:1px solid var(--line);padding:8px 11px;display:grid;gap:1px}
+.preset b{font-weight:650;font-size:15px}
+.preset span{font-size:13px;color:var(--ink-2)}
+.preset[aria-pressed="true"]{border-color:var(--ink);box-shadow:inset 3px 0 0 var(--ink)}
+.preset:hover{border-color:var(--ink-2)}
+.params{display:grid;gap:10px;border-top:1px solid var(--line-2);padding-top:10px}
+.ctl{display:grid;gap:4px}
+.ctl label{display:flex;justify-content:space-between;font-size:13.5px;color:var(--ink-2)}
+.ctl output{font-family:var(--f-mono);color:var(--ink)}
+.ctl input[type=range]{width:100%;accent-color:var(--ink)}
+.ctl select{background:var(--panel);border:1px solid var(--line);padding:6px 8px;border-radius:3px}
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px 14px}
+.tile{display:grid;gap:1px;align-content:start;border-top:1px solid var(--line);padding-top:6px}
+.tile .k{font-size:13px;color:var(--ink-2)}
+.tile .v{font-family:var(--f-mono);font-weight:400;font-size:22px;letter-spacing:-.02em}
+.tile .s{font-size:12.5px;color:var(--ink-2)}
+.cf{border-top:1px solid var(--ink);padding-top:8px;font-size:14px}
+.cf b{font-weight:650;display:block;margin-bottom:2px}
+
+.digest{display:grid;gap:4px;margin:0;padding:0;list-style:none;border-left:2px solid var(--ink);padding-left:16px;max-width:80ch}
+.digest li{font-size:16px}
+.digest .mono{font-weight:500}
+.cond{font-size:14px;color:var(--ink-2);display:flex;flex-wrap:wrap;gap:4px 18px}
+.figs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:40px 40px;padding-top:8px}
+@media (max-width:900px){.figs{grid-template-columns:1fr}}
+.figs figure{display:grid;gap:8px;align-content:start;min-width:0}
+.figs figure.wide{grid-column:1/-1}
+.figs canvas{height:180px;cursor:crosshair}
+.figs canvas.short{height:110px}
+.read{font-family:var(--f-mono);font-size:12px;color:var(--ink-2);min-height:1.5em}
+.lg{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12.5px;color:var(--ink-2)}
+.lg span{display:inline-flex;align-items:center;gap:6px}
+.lg i{width:16px;height:0;border-top:2px solid;display:inline-block}
+.lg i.faint{opacity:.4}
+table.bal{border-collapse:collapse;font-size:15px;width:100%;max-width:640px}
+table.bal td{padding:7px 0;border-bottom:1px solid var(--line)}
+table.bal td:last-child{text-align:right;font-family:var(--f-mono)}
+table.bal tr:first-child td{border-top:1.5px solid var(--ink)}
+table.bal tr:last-child td{border-bottom:1.5px solid var(--ink)}
+
+.cols{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:28px}
+@media (max-width:900px){.cols{grid-template-columns:1fr}}
+.cols > div{border-top:1.5px solid var(--ink);padding-top:10px;min-width:0}
+.cols h3{font-weight:650;font-size:17px;margin:0 0 8px}
+.cols ul{margin:0;padding-left:18px;display:grid;gap:5px;font-size:14.5px;color:var(--ink-2)}
+.role{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px 28px;margin:0;padding:0;list-style:none}
+.role li{font-size:14.5px;color:var(--ink-2)}
+.role b{display:block;color:var(--ink);font-weight:650;font-size:16px}
+footer{font-size:13px;color:var(--ink-2);max-width:110ch;display:grid;gap:6px;border-top:1px solid var(--line);padding-top:16px;margin-top:12px}
+footer p{margin:0}
+footer strong{color:var(--ink)}
+.contact{display:flex;align-items:center;gap:16px;padding-top:18px;margin-top:6px;border-top:1px solid var(--line);font-size:14px;color:var(--ink)}
+.contact img{width:72px;height:72px;border-radius:50%;object-fit:cover;flex:none}
+.contact div{display:grid;gap:2px}
+.contact b{font-size:16px}
+.contact .ln{color:var(--ink-2)}
+.contact .mail{user-select:all}
+.contact a{color:var(--accent);text-underline-offset:3px}
+::view-transition-old(root){animation:none}
+::view-transition-new(root){animation:skywipe .6s cubic-bezier(.4,0,.2,1) both}
+@keyframes skywipe{from{clip-path:inset(0 0 100% 0)}to{clip-path:inset(0 0 0 0)}}
+
+.sv-ink{stroke:var(--wire);fill:none;stroke-width:1.5}
+.sv-thin{stroke:var(--wire);fill:none;stroke-width:1}
+.sv-box{fill:var(--panel);stroke:var(--ink);stroke-width:1.4}
+.sv-bus{fill:var(--ink)}
+.sv-t{font-family:var(--f-sans);font-weight:650;font-size:13px;fill:var(--ink)}
+.sv-s{font-family:var(--f-sans);font-size:12px;fill:var(--ink-2)}
+.sv-m{font-family:var(--f-mono);font-size:13px;font-weight:400;fill:var(--ink)}
+.sv-ms{font-family:var(--f-mono);font-size:11px;fill:var(--ink-2)}
+.sv-cloud{fill:var(--cloud)}
+.flow{fill:none;stroke-linecap:round;stroke-dasharray:0.1 13;stroke-width:0}
+.ctlline{stroke:var(--ink-2);stroke-width:1;fill:none;stroke-dasharray:4 4}
+.ctlline.pulse{animation:pulse 1.4s ease-out}
+@keyframes pulse{0%{stroke:var(--genset);stroke-width:3.5}100%{stroke:var(--ink-2);stroke-width:1}}
+#ctlLayer{transition:opacity .25s}
+.hidectl #ctlLayer{opacity:0}
+.puff{fill:var(--cloud)}
+
+body.film .nofilm{display:none !important}
+body.film .wrap{max-width:1500px;gap:12px}
+body.film #chart{height:190px}
+.cap{position:absolute;left:3%;right:3%;bottom:12%;display:flex;justify-content:center;pointer-events:none}
+.cap div{--cc:var(--ink);background:var(--ink);color:var(--bg);padding:12px 18px;display:grid;grid-template-columns:auto 10px 1fr;gap:12px;align-items:center;max-width:820px;opacity:0;transform:translateY(8px);transition:opacity .35s,transform .35s}
+.cap div::after{content:"";width:10px;height:10px;border-radius:50%;background:var(--cc);order:1}
+.cap div.on{opacity:1;transform:none}
+.cap .ct{font-family:var(--f-mono);font-weight:400;font-size:18px;order:0}
+.cap .cx{font-size:19px;line-height:1.3;order:2}
+.card-film{position:fixed;inset:0;background:var(--bg);display:none;place-items:center;z-index:20;padding:24px max(24px,env(safe-area-inset-right,0px)) 24px max(24px,env(safe-area-inset-left,0px))}
+.card-film.on{display:grid}
+.card-film .in{max-width:920px;display:grid;gap:20px}
+.card-film .k{font-size:15px;color:var(--ink-2);margin:0}
+.card-film h2{font-family:var(--f-head);font-weight:650;color:var(--accent);font-size:clamp(42px,7vw,96px);line-height:.95;margin:0;text-wrap:balance}
+.card-film p{font-size:clamp(17px,2vw,22px);margin:0;color:var(--ink-2);max-width:52ch}
+.card-film .row{display:flex;flex-wrap:wrap;gap:16px 40px;border-top:1.5px solid var(--ink);padding-top:16px}
+.card-film .row div{display:grid}
+.card-film .row b{font-family:var(--f-mono);font-weight:400;font-size:clamp(28px,4vw,46px);letter-spacing:-.03em}
+.card-film .row span{font-size:14px;color:var(--ink-2)}
+.card-film .hint{font-size:13px;color:var(--muted)}
+.card-film svg{width:160px;height:56px}
+@media (prefers-reduced-motion:reduce){.cap div{transition:none}.ctlline.pulse{animation:none}::view-transition-old(root),::view-transition-new(root){animation:none}}
+</style>
+<div class="wrap">
+
+  <div class="top nofilm">
+    <div class="who">Rita Rochd<span><span lang="fr">génie électrique</span><span lang="en">electrical engineering</span></span></div>
+    <nav class="nav" aria-label="Sommaire">
+      <a href="#journee"><span lang="fr">1 La journée</span><span lang="en">1 The day</span></a>
+      <a href="#demiseconde"><span lang="fr">2 La demi-seconde</span><span lang="en">2 The half-second</span></a>
+      <a href="#methode"><span lang="fr">3 Méthode</span><span lang="en">3 Method</span></a>
+      <a href="#role"><span lang="fr">4 Mon rôle</span><span lang="en">4 My role</span></a>
+      <span class="langs" role="group" aria-label="Langue / Language"><button type="button" id="lgFr" aria-pressed="true">FR</button><button type="button" id="lgEn" aria-pressed="false">EN</button></span>
+    </nav>
+  </div>
+
+  <header class="open">
+    <div class="opentext">
+    <h1><span lang="fr">Une maison solaire, de la milliseconde à la journée</span><span lang="en">A solar house, from the millisecond to the day</span></h1>
+    <p class="lede"><span lang="fr">J’ai dimensionné, modélisé et commandé sous MATLAB/Simulink le microgrid PV–batterie d’une maison de Casablanca ; voici comment il décide, minute par minute, et comment il tient, milliseconde par milliseconde.</span><span lang="en">I sized, modelled and controlled in MATLAB/Simulink the PV–battery microgrid of a house in Casablanca; here is how it decides, minute by minute, and how it holds, millisecond by millisecond.</span></p>
+    </div>
+  </header>
+
+  <div class="sheet" id="sheetbox">
+    <div class="sheetscroll">
+      <svg id="svg" viewBox="0 30 1000 570" role="img" aria-label="Schéma unifilaire animé du microgrid">
+        <defs>
+          <clipPath id="skyClip"><rect x="16" y="40" width="968" height="65"/></clipPath>
+          <mask id="moonMask"><circle r="9" fill="#fff"/><circle cx="4.5" cy="-3" r="8" fill="#000"/></mask>
+          <linearGradient id="skyGrad" x1="0" y1="0" x2="0" y2="1"><stop id="sg0" offset="0" stop-color="#7fb0de"/><stop id="sg1" offset="1" stop-color="#cfe4f2"/></linearGradient>
+          <radialGradient id="glowGrad" cx="0.5" cy="1" r="0.5"><stop offset="0" stop-color="#ffb070" stop-opacity=".9"/><stop offset="1" stop-color="#ffb070" stop-opacity="0"/></radialGradient>
+          <radialGradient id="sunHalo"><stop id="sh0" offset="0" stop-color="#ffe7a8" stop-opacity=".85"/><stop offset="1" stop-color="#ffe7a8" stop-opacity="0"/></radialGradient>
+          <filter id="cloudBlur" x="-20%" y="-40%" width="140%" height="180%"><feGaussianBlur stdDeviation="1.6"/></filter>
+        </defs>
+        <g clip-path="url(#skyClip)">
+          <rect id="skyRect" x="16" y="40" width="968" height="65" fill="url(#skyGrad)"/>
+          <ellipse id="horizonGlow" cx="500" cy="105" rx="260" ry="55" fill="url(#glowGrad)" opacity="0"/>
+          <g id="svgStars"></g>
+          <g id="moon" opacity="0"><circle r="9" fill="#e9edf5" mask="url(#moonMask)"/></g>
+          <g id="sun"><circle r="30" fill="url(#sunHalo)"/><circle id="sunDisc" r="9" fill="#ffd36e"/></g>
+          <rect id="overcast" x="16" y="40" width="968" height="65" fill="#8d96a1" opacity="0"/>
+          <g id="clouds" filter="url(#cloudBlur)"></g>
+        </g>
+        <line x1="16" y1="105" x2="984" y2="105" class="sv-thin"/>
+        <g id="hours"></g>
+        <text x="28" y="56" class="sv-ms" id="elevTxt">–</text>
+
+        <g class="sv-ink">
+          <path d="M170 265 H330"/>
+          <path d="M150 425 H330"/>
+          <path d="M330 365 H580"/>
+          <path d="M580 250 H640 M680 250 H900"/>
+          <path d="M580 365 H770"/>
+          <path d="M580 480 H640 M680 480 H879"/>
+        </g>
+        <g id="flows">
+          <path id="F_pv"   class="flow" d="M170 265 H330" stroke="var(--solar)"/>
+          <path id="F_bat"  class="flow" d="M150 425 H330" stroke="var(--battery)"/>
+          <path id="F_dc"   class="flow" d="M330 365 H580" stroke="var(--ink-2)"/>
+          <path id="F_grid" class="flow" d="M580 250 H900" stroke="var(--grid)"/>
+          <path id="F_load" class="flow" d="M580 365 H770" stroke="var(--ink)"/>
+          <path id="F_ge"   class="flow" d="M580 480 H879" stroke="var(--genset)"/>
+        </g>
+
+        <rect x="327" y="228" width="6" height="242" class="sv-bus"/>
+        <text x="330" y="490" text-anchor="middle" class="sv-t" style="font-size:12px"><tspan lang="fr">Bus continu</tspan><tspan lang="en">DC bus</tspan></text>
+        <text x="330" y="505" text-anchor="middle" class="sv-ms">400 V</text>
+        <rect x="577" y="214" width="6" height="290" class="sv-bus"/>
+        <text x="580" y="524" text-anchor="middle" class="sv-t" style="font-size:12px"><tspan lang="fr">Bus alternatif</tspan><tspan lang="en">AC bus</tspan></text>
+        <text x="580" y="539" text-anchor="middle" class="sv-ms">230 V, 50 Hz</text>
+
+        <g transform="translate(60,230)">
+          <rect x="0" y="0" width="110" height="70" class="sv-box"/>
+          <path d="M37 0 V70 M73 0 V70 M0 35 H110" class="sv-thin" style="stroke-opacity:.5"/>
+          <path d="M18 -16 l12 12 m-4 0 h4 v-4 M36 -18 l12 12 m-4 0 h4 v-4" class="sv-thin"/>
+          <text x="55" y="92" text-anchor="middle" class="sv-t"><tspan lang="fr">Champ PV 3,6 kWc</tspan><tspan lang="en">PV array 3.6 kWp</tspan></text>
+          <text x="55" y="107" text-anchor="middle" class="sv-s"><tspan lang="fr">2 × 8 modules</tspan><tspan lang="en">2 × 8 modules</tspan></text>
+        </g>
+        <g transform="translate(200,237)">
+          <rect x="0" y="0" width="56" height="56" class="sv-box"/>
+          <path d="M0 56 L56 0" class="sv-thin"/>
+          <text x="13" y="20" text-anchor="middle" class="sv-ms">=</text><text x="43" y="47" text-anchor="middle" class="sv-ms">=</text>
+        </g>
+        <g transform="translate(60,398)">
+          <path d="M20 10 V44 M34 18 V36 M48 10 V44 M62 18 V36" class="sv-ink" style="stroke-width:2.2;stroke:var(--ink)"/>
+          <path d="M0 27 H20 M62 27 H90" class="sv-ink"/>
+          <rect x="0" y="54" width="90" height="9" class="sv-thin"/>
+          <rect id="batFill" x="1" y="55" width="44" height="7" fill="var(--battery)"/>
+          <text x="45" y="84" text-anchor="middle" class="sv-t"><tspan lang="fr">Batterie LFP 10,24 kWh</tspan><tspan lang="en">LFP battery 10.24 kWh</tspan></text>
+          <text x="45" y="99" text-anchor="middle" class="sv-s"><tspan lang="fr">32 S · 102,4 V · 100 Ah</tspan><tspan lang="en">32 S · 102.4 V · 100 Ah</tspan></text>
+        </g>
+        <g transform="translate(200,397)">
+          <rect x="0" y="0" width="56" height="56" class="sv-box"/>
+          <path d="M0 56 L56 0" class="sv-thin"/>
+          <text x="13" y="20" text-anchor="middle" class="sv-ms">=</text><text x="43" y="47" text-anchor="middle" class="sv-ms">=</text>
+        </g>
+        <g transform="translate(420,330)">
+          <rect x="0" y="0" width="70" height="70" class="sv-box"/>
+          <path d="M0 70 L70 0" class="sv-thin"/>
+          <text x="17" y="24" text-anchor="middle" class="sv-m">=</text>
+          <path d="M43 52 q5 -9 10 0 t10 0" class="sv-thin" style="stroke:var(--ink);stroke-width:1.4"/>
+          <text x="35" y="-11" text-anchor="middle" class="sv-t"><tspan lang="fr">Onduleur 4 kVA</tspan><tspan lang="en">Inverter 4 kVA</tspan></text>
+        </g>
+        <g transform="translate(770,300)">
+          <path d="M0 50 L70 4 L140 50" class="sv-ink" style="stroke:var(--ink);stroke-linejoin:round"/>
+          <rect x="12" y="44" width="116" height="80" class="sv-box"/>
+          <rect id="w1" x="26" y="60" width="24" height="22" class="sv-thin" fill="var(--panel)"/>
+          <rect id="w2" x="90" y="60" width="24" height="22" class="sv-thin" fill="var(--panel)"/>
+          <rect x="58" y="88" width="24" height="36" class="sv-thin"/>
+          <text x="70" y="144" text-anchor="middle" class="sv-t"><tspan lang="fr">Maison</tspan><tspan lang="en">House</tspan></text>
+          <text x="70" y="159" text-anchor="middle" class="sv-s" id="loadSub">–</text>
+        </g>
+        <g transform="translate(640,250)">
+          <circle cx="0" cy="0" r="2.8" fill="var(--ink)"/><circle cx="40" cy="0" r="2.8" fill="var(--ink)"/>
+          <line id="KrBlade" x1="0" y1="0" x2="40" y2="0" class="sv-ink" style="stroke:var(--ink);stroke-width:2.2"/>
+          <text x="20" y="-12" text-anchor="middle" class="sv-t" style="font-size:12px">Kr</text>
+        </g>
+        <g transform="translate(762,250)">
+          <circle r="15" class="sv-box"/><text y="3" text-anchor="middle" class="sv-ms" style="font-size:9px">kWh</text>
+          <text y="-22" text-anchor="middle" class="sv-s" style="font-size:11px"><tspan lang="fr">compteur</tspan><tspan lang="en">meter</tspan></text>
+        </g>
+        <g transform="translate(900,186)" id="pylon">
+          <path d="M20 0 L4 108 M20 0 L36 108 M8 80 H32 M12 52 H28 M0 22 H40 M14 36 L26 52 M26 36 L14 52" class="sv-ink" style="stroke:var(--ink)"/>
+          <text x="20" y="-9" text-anchor="middle" class="sv-t"><tspan lang="fr">Réseau</tspan><tspan lang="en">Grid</tspan></text>
+        </g>
+        <text x="920" y="312" text-anchor="middle" class="sv-ms" id="gridState">–</text>
+        <g transform="translate(640,480)">
+          <circle cx="0" cy="0" r="2.8" fill="var(--ink)"/><circle cx="40" cy="0" r="2.8" fill="var(--ink)"/>
+          <line id="KgeBlade" x1="0" y1="0" x2="40" y2="0" class="sv-ink" style="stroke:var(--ink);stroke-width:2.2"/>
+          <text x="50" y="-8" class="sv-t" style="font-size:12px">Kge</text>
+        </g>
+        <g transform="translate(905,480)">
+          <g id="puffs"></g>
+          <circle r="26" class="sv-box"/>
+          <text y="-2" text-anchor="middle" class="sv-t" style="font-size:16px">G</text>
+          <path d="M-9 10 q4.5 -7 9 0 t9 0" class="sv-thin" style="stroke:var(--ink)"/>
+          <text x="0" y="46" text-anchor="middle" class="sv-t"><tspan lang="fr">Groupe 2 kW</tspan><tspan lang="en">Genset 2 kW</tspan></text>
+          <text x="0" y="61" text-anchor="middle" class="sv-ms" id="geState">–</text>
+        </g>
+
+        <text id="v_pv"   x="293" y="255" text-anchor="middle" class="sv-m">–</text>
+        <text id="v_bat"  x="293" y="415" text-anchor="middle" class="sv-m">–</text>
+        <text id="v_dc"   x="375" y="355" text-anchor="middle" class="sv-m">–</text>
+        <text id="v_load" x="680" y="355" text-anchor="middle" class="sv-m">–</text>
+        <text id="v_grid" x="840" y="240" text-anchor="middle" class="sv-m">–</text>
+        <text id="v_ge"   x="770" y="470" text-anchor="middle" class="sv-m">–</text>
+
+        <g id="ctlLayer">
+          <path id="c_soc" class="ctlline" d="M60 425 H40 V172 H366"/>
+          <path id="c_pb"  class="ctlline" d="M440 202 V215 H300 V383 H228 V397"/>
+          <path id="c_kr"  class="ctlline" d="M652 172 H660 V246"/>
+          <path id="c_kge" class="ctlline" d="M610 202 V462 H648"/>
+          <text x="48" y="165" class="sv-ms">SOC</text>
+          <text x="306" y="232" class="sv-ms">P*bat</text>
+          <text x="668" y="168" class="sv-ms"><tspan lang="fr">ordre Kr</tspan><tspan lang="en">Kr command</tspan></text>
+          <text x="618" y="455" class="sv-ms"><tspan lang="fr">démarrage</tspan><tspan lang="en">start</tspan></text>
+          <rect x="366" y="144" width="286" height="58" class="sv-box" style="stroke-width:1.8"/>
+          <text x="378" y="163" class="sv-t"><tspan lang="fr">Superviseur EMS</tspan><tspan lang="en">EMS supervisor</tspan></text>
+          <text x="378" y="180" class="sv-ms" id="emsMode">–</text>
+          <text x="378" y="194" class="sv-ms" id="emsRule" style="font-size:9.5px">–</text>
+          <g transform="translate(196,308)">
+            <text class="sv-ms" style="font-weight:500;fill:var(--ink)">MPPT P&amp;O</text>
+            <text y="14" class="sv-ms" id="tagPv">–</text>
+          </g>
+          <g transform="translate(194,470)">
+            <text class="sv-ms" style="font-weight:500;fill:var(--ink)"><tspan lang="fr">Boucle de courant</tspan><tspan lang="en">Current loop</tspan></text>
+            <text y="14" class="sv-ms" id="tagBat">–</text>
+          </g>
+          <g transform="translate(420,418)">
+            <text class="sv-ms" style="font-weight:500;fill:var(--ink)" id="tagInv1">–</text>
+            <text y="14" class="sv-ms" id="tagInv2">–</text>
+          </g>
+          <g transform="translate(700,522)">
+            <text class="sv-ms" style="font-weight:500;fill:var(--ink)"><tspan lang="fr">Statisme 4 % + AVR</tspan><tspan lang="en">4% droop + AVR</tspan></text>
+            <text y="14" class="sv-ms" id="tagGe">–</text>
+          </g>
+        </g>
+
+        <g transform="translate(28,568)">
+          <text class="sv-ms" style="font-size:10.5px"><tspan lang="fr">Trait plein : puissance. Pointillé : consigne ou mesure.</tspan><tspan lang="en">Solid line: power. Dashed: setpoint or measurement.</tspan></text>
+          <text y="15" class="sv-ms" style="font-size:10.5px"><tspan lang="fr">Épaisseur du flux proportionnelle à la puissance.</tspan><tspan lang="en">Flow thickness proportional to power.</tspan></text>
+        </g>
+        <g transform="translate(972,568)">
+          <text text-anchor="end" class="sv-ms" style="font-size:10.5px"><tspan lang="fr">Schéma unifilaire, R. Rochd</tspan><tspan lang="en">Single-line diagram, R. Rochd</tspan></text>
+          <text y="15" text-anchor="end" class="sv-ms" style="font-size:10.5px">UIC, S9, 2026</text>
+        </g>
+      </svg>
+      <svg id="svgM" viewBox="0 0 340 624" role="img" aria-label="Schéma unifilaire du microgrid, version verticale">
+        <g class="sv-ink">
+          <path d="M60 152 V250"/>
+          <path d="M262 140 V250"/>
+          <path d="M170 255 V390"/>
+          <path d="M56 395 V420 M56 450 V458 M56 486 V494"/>
+          <path d="M160 395 V476"/>
+          <path d="M268 395 V420 M268 450 V488"/>
+        </g>
+        <g>
+          <path id="F_pv_m"   class="flow" d="M60 152 V250" stroke="var(--solar)"/>
+          <path id="F_bat_m"  class="flow" d="M262 140 V250" stroke="var(--battery)"/>
+          <path id="F_dc_m"   class="flow" d="M170 255 V390" stroke="var(--ink-2)"/>
+          <path id="F_grid_m" class="flow" d="M56 395 V494" stroke="var(--grid)"/>
+          <path id="F_load_m" class="flow" d="M160 395 V476" stroke="var(--ink)"/>
+          <path id="F_ge_m"   class="flow" d="M268 395 V488" stroke="var(--genset)"/>
+        </g>
+        <rect x="6" y="6" width="328" height="58" class="sv-box" style="stroke-width:1.6"/>
+        <text x="16" y="26" class="sv-t"><tspan lang="fr">Superviseur EMS</tspan><tspan lang="en">EMS supervisor</tspan></text>
+        <text x="16" y="43" class="sv-ms" id="emsMode_m">–</text>
+        <text x="16" y="58" class="sv-ms" id="emsRule_m" style="font-size:11px">–</text>
+
+        <text x="10" y="86" class="sv-t"><tspan lang="fr">Champ PV 3,6 kWc</tspan><tspan lang="en">PV array 3.6 kWp</tspan></text>
+        <text x="10" y="101" class="sv-s"><tspan lang="fr">2 × 8 modules</tspan><tspan lang="en">2 × 8 modules</tspan></text>
+        <rect x="20" y="110" width="80" height="42" class="sv-box"/>
+        <path d="M47 110 V152 M73 110 V152 M20 131 H100" class="sv-thin" style="stroke-opacity:.5"/>
+        <rect x="42" y="174" width="36" height="36" class="sv-box"/><path d="M42 210 L78 174" class="sv-thin"/>
+        <text id="v_pv_m" x="68" y="236" class="sv-m">–</text>
+
+        <text x="334" y="86" text-anchor="end" class="sv-t"><tspan lang="fr">Batterie LFP 10,24 kWh</tspan><tspan lang="en">LFP battery 10.24 kWh</tspan></text>
+        <text x="334" y="101" text-anchor="end" class="sv-s"><tspan lang="fr">32 S · 102,4 V · 100 Ah</tspan><tspan lang="en">32 S · 102.4 V · 100 Ah</tspan></text>
+        <rect x="218" y="107" width="88" height="7" class="sv-thin"/>
+        <rect id="batFill_m" x="218" y="107" width="44" height="7" fill="var(--battery)"/>
+        <path d="M244 120 H280 M251 126 H273 M244 132 H280 M251 138 H273" class="sv-ink" style="stroke:var(--ink);stroke-width:2.2"/>
+        <rect x="244" y="174" width="36" height="36" class="sv-box"/><path d="M244 210 L280 174" class="sv-thin"/>
+        <text id="v_bat_m" x="270" y="236" class="sv-m">–</text>
+
+        <rect x="20" y="250" width="300" height="5" class="sv-bus"/>
+        <text x="320" y="272" text-anchor="end" class="sv-ms"><tspan lang="fr">bus continu 400 V</tspan><tspan lang="en">DC bus 400 V</tspan></text>
+        <rect x="146" y="290" width="48" height="48" class="sv-box"/><path d="M146 338 L194 290" class="sv-thin"/>
+        <text x="138" y="318" text-anchor="end" class="sv-t"><tspan lang="fr">Onduleur 4 kVA</tspan><tspan lang="en">Inverter 4 kVA</tspan></text>
+        <text id="v_dc_m" x="202" y="318" class="sv-m">–</text>
+        <text x="320" y="368" text-anchor="end" class="sv-ms"><tspan lang="fr">bus alternatif</tspan><tspan lang="en">AC bus</tspan></text>
+        <text x="320" y="382" text-anchor="end" class="sv-ms">230 V, 50 Hz</text>
+        <rect x="20" y="390" width="300" height="5" class="sv-bus"/>
+
+        <text id="v_grid_m" x="62" y="414" class="sv-m">–</text>
+        <g transform="translate(56,420)"><circle r="2.8" fill="var(--ink)"/><circle cy="30" r="2.8" fill="var(--ink)"/><line id="KrBlade_m" x1="0" y1="0" x2="0" y2="30" class="sv-ink" style="stroke:var(--ink);stroke-width:2.2"/></g>
+        <text x="44" y="440" text-anchor="end" class="sv-t">Kr</text>
+        <circle cx="56" cy="472" r="14" class="sv-box"/><text x="56" y="476" text-anchor="middle" class="sv-ms" style="font-size:11px">kWh</text>
+        <g id="pylon_m" transform="translate(45,494) scale(.55)"><path d="M20 0 L4 108 M20 0 L36 108 M8 80 H32 M12 52 H28 M0 22 H40 M14 36 L26 52 M26 36 L14 52" class="sv-ink" style="stroke:var(--ink);stroke-width:2.6"/></g>
+        <text x="56" y="574" text-anchor="middle" class="sv-t"><tspan lang="fr">Réseau</tspan><tspan lang="en">Grid</tspan></text>
+        <text x="56" y="590" text-anchor="middle" class="sv-ms" id="gridState_m">–</text>
+
+        <text id="v_load_m" x="166" y="414" class="sv-m">–</text>
+        <path d="M112 506 L160 476 L208 506" class="sv-ink" style="stroke:var(--ink);stroke-linejoin:round"/>
+        <rect x="122" y="500" width="76" height="54" class="sv-box"/>
+        <rect id="w1_m" x="132" y="510" width="18" height="15" class="sv-thin" fill="var(--panel)"/>
+        <rect id="w2_m" x="170" y="510" width="18" height="15" class="sv-thin" fill="var(--panel)"/>
+        <rect x="151" y="532" width="18" height="22" class="sv-thin"/>
+        <text x="160" y="574" text-anchor="middle" class="sv-t"><tspan lang="fr">Maison</tspan><tspan lang="en">House</tspan></text>
+        <text x="160" y="590" text-anchor="middle" class="sv-s" id="loadSub_m">–</text>
+
+        <text id="v_ge_m" x="274" y="414" class="sv-m">–</text>
+        <g transform="translate(268,420)"><circle r="2.8" fill="var(--ink)"/><circle cy="30" r="2.8" fill="var(--ink)"/><line id="KgeBlade_m" x1="0" y1="0" x2="0" y2="30" class="sv-ink" style="stroke:var(--ink);stroke-width:2.2"/></g>
+        <text x="256" y="440" text-anchor="end" class="sv-t">Kge</text>
+        <circle cx="268" cy="512" r="24" class="sv-box"/>
+        <text x="268" y="511" text-anchor="middle" class="sv-t" style="font-size:16px">G</text>
+        <path d="M259 522 q4.5 -7 9 0 t9 0" class="sv-thin" style="stroke:var(--ink)"/>
+        <text x="268" y="574" text-anchor="middle" class="sv-t"><tspan lang="fr">Groupe 2 kW</tspan><tspan lang="en">Genset 2 kW</tspan></text>
+        <text x="268" y="590" text-anchor="middle" class="sv-ms" id="geState_m">–</text>
+
+        <text x="10" y="616" class="sv-s"><tspan lang="fr">Épaisseur du flux proportionnelle à la puissance.</tspan><tspan lang="en">Flow thickness proportional to power.</tspan></text>
+      </svg>
+    </div>
+    <div class="cap" aria-live="polite"><div id="cap"><span class="ct" id="capT"></span><span class="cx" id="capX"></span></div></div>
+  </div>
+  <div class="desk" role="toolbar" aria-label="Simulation">
+    <div class="clockbox">
+      <span class="time" id="time">13:00</span>
+      <span class="day" id="dayLabel">–</span>
+      <span class="mode" id="mode">–</span>
+    </div>
+    <span class="sep"></span>
+    <div class="grp">
+      <button class="btn play" id="play" type="button"><span id="playTxt">–</span></button>
+      <select class="sel" id="speed" aria-label="Vitesse">
+        <option value="0.5">30 min/s</option>
+        <option value="1" selected>1 h/s</option>
+        <option value="2">2 h/s</option>
+        <option value="4">4 h/s</option>
+      </select>
+      <button class="btn" id="restart" type="button"><span lang="fr">Minuit</span><span lang="en">Midnight</span></button>
+    </div>
+    <span class="sep"></span>
+    <div class="grp">
+      <button class="btn cut" id="evGrid" type="button" aria-pressed="false"><span class="sw" style="background:var(--grid)"></span><span id="evGridTxt">–</span></button>
+      <button class="btn" id="evCloud" type="button"><span class="sw" style="background:var(--cloud)"></span><span lang="fr">Nuage 45 min</span><span lang="en">Cloud 45 min</span></button>
+      <button class="btn" id="evOven" type="button"><span class="sw" style="background:var(--ink)"></span><span lang="fr">Four +2 kW</span><span lang="en">Oven +2 kW</span></button>
+    </div>
+    <span class="sep"></span>
+    <div class="grp">
+      <button class="btn" id="tglCtl" type="button" aria-pressed="true"><span lang="fr">Consignes</span><span lang="en">Setpoints</span></button>
+      <button class="btn" id="film" type="button"><span lang="fr">Mode film</span><span lang="en">Film mode</span></button>
+      <span class="kbd nofilm"><span lang="fr">Clavier : espace, ← →, C, N, F</span><span lang="en">Keys: space, ← →, C, N, F</span></span>
+    </div>
+  </div>
+
+
+
+  <div class="part" id="journee">
+    <div class="mk"><svg class="pvmini" viewBox="0 0 96 34" aria-hidden="true"></svg><span>1</span></div>
+    <h2><span lang="fr">La journée, minute par minute</span><span lang="en">The day, minute by minute</span></h2>
+    <p class="nofilm"><span lang="fr">Simulateur énergétique au pas d'une minute avec les règles du superviseur. Les modes raccordé, îlotage et secours sont validés au niveau énergétique. Seul le mode raccordé est validé en simulation électrique (partie 2).</span><span lang="en">Energy simulator with a one-minute step and the supervisor's rules. Grid-connected, islanded and backup modes are validated at energy level. Only the grid-connected mode is validated in electrical simulation (part 2).</span></p>
+  </div>
+
+  <section class="inst">
+    <div class="panel">
+      <p class="h"><span lang="fr">Batterie</span><span lang="en">Battery</span> <small id="batState">–</small></p>
+      <div class="big" id="socBig">–</div>
+      <div class="socbar"><div class="socfill" id="socFill"></div><i style="left:20%"></i><i style="left:50%"></i><i style="left:90%"></i></div>
+      <div class="socscale"><span style="left:20%">20</span><span style="left:50%">50</span><span style="left:90%">90</span></div>
+      <dl class="kv">
+        <dt><span lang="fr">Puissance</span><span lang="en">Power</span></dt><dd id="batP">–</dd>
+        <dt><span lang="fr">Courant (102,4 V)</span><span lang="en">Current (102.4 V)</span></dt><dd id="batI">–</dd>
+        <dt id="autLab">–</dt><dd id="batAut">–</dd>
+      </dl>
+    </div>
+    <div class="panel">
+      <p class="h"><span lang="fr">Point de fonctionnement PV</span><span lang="en">PV operating point</span> <small id="gTxt">–</small></p>
+      <canvas id="pvc" aria-label="P–V"></canvas>
+      <p class="capt" id="pvCapt">–</p>
+    </div>
+    <div class="panel">
+      <p class="h"><span lang="fr">Côté alternatif, illustration</span><span lang="en">AC side, illustration</span></p>
+      <canvas id="scope" aria-label="v, i"></canvas>
+      <p class="capt" id="scopeCapt">–</p>
+    </div>
+  </section>
+
+  <section class="panel tl">
+    <div class="tlhead">
+      <p class="h" style="margin:0"><span lang="fr">Chronogramme des 24 heures</span><span lang="en">24-hour timeline</span></p>
+      <div class="legend">
+        <span><i style="background:var(--solar)"></i><span lang="fr">Solaire</span><span lang="en">Solar</span></span>
+        <span><i style="background:var(--battery)"></i><span lang="fr">Batterie</span><span lang="en">Battery</span></span>
+        <span><i style="background:var(--grid)"></i><span lang="fr">Réseau</span><span lang="en">Grid</span></span>
+        <span><i style="background:var(--genset)"></i><span lang="fr">Groupe</span><span lang="en">Genset</span></span>
+        <span><i style="border-top:2px solid var(--ink);height:0;width:14px"></i><span lang="fr">Consommation</span><span lang="en">Load</span></span>
+        <span><i style="background:repeating-linear-gradient(45deg,var(--line) 0 2px,transparent 2px 5px);border:1px solid var(--line)"></i><span lang="fr">Réseau coupé</span><span lang="en">Grid off</span></span>
+      </div>
+    </div>
+    <canvas id="chart" aria-label="Chronogramme"></canvas>
+    <div class="story" aria-live="polite">
+      <span class="t" id="stT">13:00</span>
+      <p id="stX">–</p>
+      <span class="rule" id="stR">–</span>
+    </div>
+  </section>
+
+  <section class="lower nofilm">
+    <div class="panel">
+      <p class="h"><span lang="fr">Journal de bord</span><span lang="en">Event log</span> <small id="jCount">–</small></p>
+      <ol class="jl" id="journal"></ol>
+    </div>
+    <div class="panel">
+      <p class="h"><span lang="fr">Scénarios</span><span lang="en">Scenarios</span></p>
+      <div class="presets" id="presets"></div>
+      <div class="params">
+        <div class="ctl"><label for="season"><span lang="fr">Saison</span><span lang="en">Season</span></label><select id="season"><option value="dec">–</option><option value="jul">–</option></select></div>
+        <div class="ctl"><label for="cloud"><span><span lang="fr">Voile nuageux de fond</span><span lang="en">Background cloud cover</span></span> <output id="o_cloud">–</output></label><input type="range" id="cloud" min="0" max="80" step="5" value="0"></div>
+        <div class="ctl"><label for="cons"><span><span lang="fr">Consommation</span><span lang="en">Consumption</span></span> <output id="o_cons">–</output></label><input type="range" id="cons" min="50" max="180" step="10" value="100"></div>
+        <div class="ctl"><label for="soc0"><span><span lang="fr">Batterie à minuit</span><span lang="en">Battery at midnight</span></span> <output id="o_soc0">–</output></label><input type="range" id="soc0" min="20" max="90" step="5" value="50"></div>
+      </div>
+    </div>
+    <div class="panel">
+      <p class="h"><span lang="fr">Bilan des 24 heures</span><span lang="en">24-hour balance</span></p>
+      <div class="tiles">
+        <div class="tile"><span class="k"><span lang="fr">Solaire</span><span lang="en">Solar</span></span><span class="v" id="t_pv">–</span><span class="s" id="t_pv_s">–</span></div>
+        <div class="tile"><span class="k"><span lang="fr">Autonomie</span><span lang="en">Self-sufficiency</span></span><span class="v" id="t_aut">–</span><span class="s"><span lang="fr">de la consommation couverte sur place</span><span lang="en">of consumption covered on site</span></span></div>
+        <div class="tile"><span class="k"><span lang="fr">Réseau</span><span lang="en">Grid</span></span><span class="v" id="t_grid">–</span><span class="s" id="t_grid_s">–</span></div>
+        <div class="tile"><span class="k"><span lang="fr">Groupe</span><span lang="en">Genset</span></span><span class="v" id="t_ge">–</span><span class="s" id="t_ge_s">–</span></div>
+      </div>
+      <div class="cf"><b><span lang="fr">Même journée sans batterie</span><span lang="en">Same day without battery</span></b><span id="cfTxt">–</span></div>
+    </div>
+  </section>
+
+  <div class="part nofilm" id="demiseconde">
+    <div class="mk"><svg class="pvmini" viewBox="0 0 96 34" aria-hidden="true"></svg><span>2</span></div>
+    <h2><span lang="fr">La demi-seconde, à l'échelle des convertisseurs</span><span lang="en">The half-second, at converter scale</span></h2>
+    <p><span lang="fr">Signaux exportés de la simulation Simulink du système complet, commandes en boucle fermée. Le survol d'une courbe affiche les valeurs.</span><span lang="en">Signals exported from the Simulink simulation of the complete system, closed-loop control. Hovering over a curve shows the values.</span></p>
+  </div>
+  <ul class="digest nofilm">
+    <li><span lang="fr"><span class="mono">3,70 kW</span> extraits par le MPPT en <span class="mono">0,15 s</span>.</span><span lang="en"><span class="mono">3.70 kW</span> extracted by the MPPT in <span class="mono">0.15 s</span>.</span></li>
+    <li><span lang="fr">Bus continu tenu à <span class="mono">400 V ± 0,6 V</span>.</span><span lang="en">DC bus held at <span class="mono">400 V ± 0.6 V</span>.</span></li>
+    <li><span lang="fr">Courant de l'onduleur en phase avec le réseau, déphasage <span class="mono">≈ 2°</span>.</span><span lang="en">Inverter current in phase with the grid, phase shift <span class="mono">≈ 2°</span>.</span></li>
+  </ul>
+  <p class="cond nofilm"><span lang="fr">Essai : mode raccordé, 1000 W/m², charge 1 kW, SOC initial 50 %, durée 0,5 s, bus préchargé à 400 V, export à 8 kHz.</span><span lang="en">Test: grid-connected mode, 1000 W/m², 1 kW load, initial SOC 50%, 0.5 s duration, bus precharged to 400 V, exported at 8 kHz.</span></p>
+
+  <section class="figs nofilm">
+    <figure>
+      <canvas id="c_pm" class="short" aria-label="P_pv"></canvas>
+      <canvas id="c_vpv" aria-label="V_pv, V_ref"></canvas>
+      <div class="lg"><span><i style="border-color:var(--solar)"></i>P_pv</span><span><i class="faint" style="border-color:var(--solar)"></i><span lang="fr">V_pv mesurée</span><span lang="en">V_pv measured</span></span><span><i style="border-color:var(--solar)"></i><span lang="fr">V_pv, moyenne 5 ms</span><span lang="en">V_pv, 5 ms mean</span></span><span><i style="border-color:var(--ink);border-top-style:dashed"></i>V_ref</span></div>
+      <div class="read" id="r_c_vpv"></div>
+      <figcaption><span lang="fr"><b>Fig. 1.</b> MPPT par perturbation et observation sur le hacheur boost. Puissance du champ (haut), tension mesurée et consigne (bas). La consigne monte par pas de 2 V toutes les 20 ms jusqu'à 244–246 V, puis oscille autour du point de puissance maximale. 3,70 kW extraits, atteints en 0,15 s. Écart moyen de suivi de la boucle de tension 0,02 V.</span><span lang="en"><b>Fig. 1.</b> Perturb-and-observe MPPT on the boost chopper. Array power (top), measured voltage and setpoint (bottom). The setpoint rises in 2 V steps every 20 ms up to 244–246 V, then oscillates around the maximum power point. 3.70 kW extracted, reached in 0.15 s. Mean tracking error of the voltage loop 0.02 V.</span></figcaption>
+    </figure>
+    <figure>
+      <canvas id="c_vdc" aria-label="V_dc"></canvas>
+      <div class="read" id="r_c_vdc"></div>
+      <figcaption><span lang="fr"><b>Fig. 2.</b> Tension du bus continu, régulée par l'onduleur. Au démarrage le MPPT injecte 3,7 kW avant que la batterie n'absorbe le surplus, le bus monte à 414 V (+3,5 %). La boucle d'énergie le ramène à 400 V en 0,2 s. Ondulation ±0,6 V après 0,25 s.</span><span lang="en"><b>Fig. 2.</b> DC bus voltage, regulated by the inverter. At start-up the MPPT injects 3.7 kW before the battery absorbs the surplus, and the bus rises to 414 V (+3.5%). The energy loop brings it back to 400 V in 0.2 s. Ripple ±0.6 V after 0.25 s.</span></figcaption>
+    </figure>
+    <figure>
+      <canvas id="c_ibat" aria-label="I_bat"></canvas>
+      <div class="lg"><span><i class="faint" style="border-color:var(--battery)"></i><span lang="fr">I_bat mesuré</span><span lang="en">I_bat measured</span></span><span><i style="border-color:var(--ink)"></i><span lang="fr">consigne du superviseur</span><span lang="en">supervisor setpoint</span></span></div>
+      <div class="read" id="r_c_ibat"></div>
+      <figcaption><span lang="fr"><b>Fig. 3.</b> Courant batterie et consigne du superviseur, qui demande d'absorber le surplus solaire (P_load − P_pv). Consigne −26,5 A, soit une charge de 2,7 kW. Écart moyen 0,5 A, établissement en 20 ms. Un courant négatif correspond à une charge.</span><span lang="en"><b>Fig. 3.</b> Battery current and supervisor setpoint, which asks the battery to absorb the solar surplus (P_load − P_pv). Setpoint −26.5 A, i.e. 2.7 kW charging. Mean error 0.5 A, settling time 20 ms. Negative current means charging.</span></figcaption>
+    </figure>
+    <figure>
+      <canvas id="c_pll" aria-label="v_d, v_q"></canvas>
+      <canvas id="c_f" class="short" aria-label="f"></canvas>
+      <div class="lg"><span><i style="border-color:var(--ink)"></i>v_d</span><span><i style="border-color:var(--grid)"></i>v_q</span><span><i style="border-color:var(--genset)"></i><span lang="fr">fréquence</span><span lang="en">frequency</span></span></div>
+      <div class="read" id="r_c_pll"></div>
+      <figcaption><span lang="fr"><b>Fig. 4.</b> PLL SOGI, synchronisation sur le réseau. Verrouillage en 0,08 s. v_d tend vers 325 V, l'amplitude du réseau, et v_q s'annule, l'angle estimé est alors calé sur la tension du réseau. Fréquence estimée 50,00 Hz.</span><span lang="en"><b>Fig. 4.</b> SOGI PLL, grid synchronisation. Lock in 0.08 s. v_d settles at 325 V, the grid amplitude, and v_q goes to zero, so the estimated angle is aligned with the grid voltage. Estimated frequency 50.00 Hz.</span></figcaption>
+    </figure>
+    <figure class="wide">
+      <canvas id="c_ig" aria-label="v_g, i_g"></canvas>
+      <div class="lg"><span><i style="border-color:var(--muted)"></i><span lang="fr">v_g (échelle de droite)</span><span lang="en">v_g (right axis)</span></span><span><i class="faint" style="border-color:var(--grid)"></i><span lang="fr">i_g mesuré</span><span lang="en">i_g measured</span></span><span><i style="border-color:var(--grid)"></i><span lang="fr">i_g, fondamental 50 Hz</span><span lang="en">i_g, 50 Hz fundamental</span></span></div>
+      <div class="read" id="r_c_ig"></div>
+      <figcaption><span lang="fr"><b>Fig. 5.</b> Tension du réseau et courant de l'onduleur, fenêtre 0,40–0,44 s. Fondamental extrait par transformée de Fourier glissante sur une période. Crête 5,7 A, déphasage ≈ 2° avec v_g, 935 W fournis à la maison, échange avec le réseau ≈ 0. Puissance active sans réactif. Le courant mesuré garde une ondulation haute fréquence, prochaine amélioration du modèle.</span><span lang="en"><b>Fig. 5.</b> Grid voltage and inverter current, 0.40–0.44 s window. Fundamental extracted by a sliding Fourier transform over one period. Peak 5.7 A, ≈ 2° phase shift with v_g, 935 W supplied to the house, grid exchange ≈ 0. Active power with no reactive component. The measured current still carries high-frequency ripple, the next improvement of the model.</span></figcaption>
+    </figure>
+    <figure class="wide">
+      <table class="bal">
+        <tr><td><span lang="fr">Production du champ PV</span><span lang="en">PV array production</span></td><td><span lang="fr">3,70 kW</span><span lang="en">3.70 kW</span></td></tr>
+        <tr><td><span lang="fr">Charge de la batterie (26,5 A × 102 V)</span><span lang="en">Battery charging (26.5 A × 102 V)</span></td><td><span lang="fr">2,71 kW</span><span lang="en">2.71 kW</span></td></tr>
+        <tr><td><span lang="fr">Fournie par l'onduleur à la maison</span><span lang="en">Supplied by the inverter to the house</span></td><td><span lang="fr">0,94 kW</span><span lang="en">0.94 kW</span></td></tr>
+        <tr><td><span lang="fr">Échange avec le réseau</span><span lang="en">Grid exchange</span></td><td>≈ 0</td></tr>
+      </table>
+      <figcaption><span lang="fr"><b>Tableau 1.</b> Bilan de puissance en régime établi. Le surplus solaire va dans la batterie plutôt que sur le réseau, comportement demandé au superviseur en autoconsommation.</span><span lang="en"><b>Table 1.</b> Steady-state power balance. The solar surplus goes to the battery rather than the grid, the behaviour required of the supervisor in self-consumption.</span></figcaption>
+    </figure>
+  </section>
+
+  <div class="part nofilm" id="methode">
+    <div class="mk"><svg class="pvmini" viewBox="0 0 96 34" aria-hidden="true"></svg><span>3</span></div>
+    <h2><span lang="fr">Méthode et limites</span><span lang="en">Method and limits</span></h2>
+    <p><span lang="fr">Ce qui est démontré, ce qui est estimé, ce qui manque.</span><span lang="en">What is demonstrated, what is estimated, what is missing.</span></p>
+  </div>
+  <section class="cols nofilm">
+    <div>
+      <h3><span lang="fr">Validé en simulation électrique</span><span lang="en">Validated in electrical simulation</span></h3>
+      <ul lang="fr">
+        <li>MPPT P&amp;O, boucle de tension PV et de courant du hacheur</li>
+        <li>Boucle de courant de la batterie et suivi de la consigne du superviseur</li>
+        <li>PLL SOGI, correcteur proportionnel-résonant, régulation de V_dc</li>
+        <li>Statisme et régulation de tension du groupe (essai séparé)</li>
+        <li>Système complet en mode raccordé (partie 2)</li>
+      </ul>
+      <ul lang="en">
+        <li>P&amp;O MPPT, PV voltage loop and chopper current loop</li>
+        <li>Battery current loop and tracking of the supervisor setpoint</li>
+        <li>SOGI PLL, proportional-resonant controller, V_dc regulation</li>
+        <li>Genset droop and voltage regulation (separate test)</li>
+        <li>Complete system in grid-connected mode (part 2)</li>
+      </ul>
+    </div>
+    <div>
+      <h3><span lang="fr">Validé au pas de la minute</span><span lang="en">Validated at one-minute step</span></h3>
+      <ul lang="fr">
+        <li>Îlotage sur batterie et secours par le groupe validés sur les règles du superviseur seulement, pas encore de simulation électrique en formeur de réseau</li>
+        <li>Journée de décembre (PVGIS) ; juillet par un modèle de ciel clair recalé, à titre indicatif</li>
+        <li>L'oscilloscope et la courbe P–V de la partie 1 sont des illustrations calculées, pas des mesures</li>
+      </ul>
+      <ul lang="en">
+        <li>Islanding on battery and genset backup validated on supervisor rules only, no grid-forming electrical simulation yet</li>
+        <li>December day from PVGIS; July from a rescaled clear-sky model, indicative only</li>
+        <li>The oscilloscope and P–V curve in part 1 are computed illustrations, not measurements</li>
+      </ul>
+    </div>
+    <div>
+      <h3><span lang="fr">Limites connues</span><span lang="en">Known limits</span></h3>
+      <ul lang="fr">
+        <li>Pertes des convertisseurs et effet de la température non comptés dans le bilan journalier</li>
+        <li>Le champ donne 3,72 kW sous 1000 W/m² pour 3,6 kWc nominaux, écart dû aux paramètres du modèle de module, à recaler</li>
+        <li>Ondulation haute fréquence du courant de l'onduleur</li>
+        <li>Protections (découplage, anti-îlotage) et vieillissement de la batterie non modélisés</li>
+      </ul>
+      <ul lang="en">
+        <li>Converter losses and temperature effects not included in the daily balance</li>
+        <li>The array gives 3.72 kW under 1000 W/m² for 3.6 kWp rated, a gap due to the module model parameters, to be recalibrated</li>
+        <li>High-frequency ripple on the inverter current</li>
+        <li>Protections (decoupling, anti-islanding) and battery ageing not modelled</li>
+      </ul>
+    </div>
+  </section>
+
+  <div class="part nofilm" id="role">
+    <div class="mk"><svg class="pvmini" viewBox="0 0 96 34" aria-hidden="true"></svg><span>4</span></div>
+    <h2><span lang="fr">Mon rôle</span><span lang="en">My role</span></h2>
+    <p><span lang="fr">Projet de génie électrique (S9, Université Internationale de Casablanca), prolongé par ce simulateur, conçu de ma propre initiative.</span><span lang="en">Electrical engineering project (S9, Université Internationale de Casablanca), extended with this simulator on my own initiative.</span></p>
+  </div>
+  <ul class="role nofilm">
+    <li><b><span lang="fr">Dimensionnement</span><span lang="en">Sizing</span></b><span lang="fr">Champ PV, batterie, onduleur, filtres, bus continu, groupe de secours</span><span lang="en">PV array, battery, inverter, filters, DC bus, backup genset</span></li>
+    <li><b><span lang="fr">Modélisation</span><span lang="en">Modelling</span></b><span lang="fr">Modèles Simulink/Simscape du champ, des convertisseurs, de la batterie et du réseau</span><span lang="en">Simulink/Simscape models of the array, converters, battery and grid</span></li>
+    <li><b><span lang="fr">Commande</span><span lang="en">Control</span></b><span lang="fr">Réglage des boucles par placement de pôles : MPPT, courant, tension, PLL, PR, statisme</span><span lang="en">Loop tuning by pole placement: MPPT, current, voltage, PLL, PR, droop</span></li>
+    <li><b><span lang="fr">Supervision</span><span lang="en">Supervision</span></b><span lang="fr">Règles de gestion d'énergie : SOC, hystérésis du groupe, délestage</span><span lang="en">Energy management rules: SOC, genset hysteresis, load shedding</span></li>
+    <li><b><span lang="fr">Ce simulateur</span><span lang="en">This simulator</span></b><span lang="fr">Idée, scénarios, modèle journalier et mise en forme des résultats</span><span lang="en">Concept, scenarios, daily model and presentation of the results</span></li>
+  </ul>
+
+  <footer class="nofilm">
+    <p lang="fr"><strong>Modèle.</strong> Bilan de puissance au pas d'une minute, mêmes règles que le superviseur du projet. SOC maintenu entre 20 et 90 %, groupe démarré à 20 % et arrêté à 50 % après 15 min de marche au moins, batterie limitée à 3,58 kW (35 A), rendement de charge et de décharge 95 %, consommation du groupe 0,246 L/kWh + 0,084 L/h par kW nominal.</p>
+    <p lang="en"><strong>Model.</strong> Power balance with a one-minute step, same rules as the project supervisor. SOC kept between 20 and 90%, genset started at 20% and stopped at 50% after at least 15 min of running, battery limited to 3.58 kW (35 A), 95% charge and discharge efficiency, genset consumption 0.246 L/kWh + 0.084 L/h per rated kW.</p>
+    <p lang="fr"><strong>Données.</strong> Décembre : production horaire moyenne PVGIS à Casablanca (33,57° N). Juillet : modèle de ciel clair (inclinaison 30° plein sud) recalé sur l'énergie PVGIS de décembre, à titre indicatif. Courbe P–V : modèle à une diode du champ 2 × 8 modules à 25 °C, ajusté sur les points de la simulation Simulink (3,72 kW à 244 V sous 1000 W/m², 1,01 kW à 224 V sous 300 W/m²). Heure locale UTC+1.</p>
+    <p lang="en"><strong>Data.</strong> December: PVGIS mean hourly production in Casablanca (33.57° N). July: clear-sky model (30° tilt, due south) rescaled to the December PVGIS energy, indicative only. P–V curve: single-diode model of the 2 × 8 module array at 25 °C, fitted to the Simulink points (3.72 kW at 244 V under 1000 W/m², 1.01 kW at 224 V under 300 W/m²). Local time UTC+1.</p>
+    <div class="contact">
+      <img src="rita_rochd.jpg" alt="Rita Rochd" width="72" height="72">
+      <div><b>Rita Rochd</b><span lang="fr">Élève ingénieure en génie électrique, électrotechnique et électronique de puissance</span><span lang="en">Electrical engineering student, electrotechnics and power electronics</span>
+      <span class="ln"><span class="mail">ritarochd@gmail.com</span> · <a href="https://www.linkedin.com/in/rita-rochd" target="_blank" rel="noopener">LinkedIn</a></span></div>
+    </div>
+  </footer>
+</div>
+
+<div class="card-film" id="intro"><div class="in">
+  <svg class="pvmini" viewBox="0 0 96 34" aria-hidden="true"></svg>
+  <p class="k" id="introK">–</p>
+  <h2><span lang="fr">24 heures dans une maison solaire</span><span lang="en">24 hours in a solar house</span></h2>
+  <p id="introP">–</p>
+</div></div>
+<div class="card-film" id="outro"><div class="in">
+  <svg class="pvmini" viewBox="0 0 96 34" aria-hidden="true"></svg>
+  <h2 id="outroH">–</h2>
+  <div class="row" id="outroRow"></div>
+  <p id="outroP">–</p>
+  <span class="hint"><span lang="fr">Échap ou clic pour revenir au simulateur</span><span lang="en">Esc or click to return to the simulator</span></span>
+</div></div>
+<script>
+(() => {
+'use strict';
+const ROOT = document.documentElement;
+let LANG = 'fr';
+try { const s = localStorage.getItem('pvsim-lang'); if (s === 'en' || s === 'fr') LANG = s; } catch (e) {}
+ROOT.dataset.lang = LANG; ROOT.lang = LANG;
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const L = (f, e) => LANG === 'en' ? e : f;
+const loc = () => LANG === 'en' ? 'en-US' : 'fr-FR';
+const pct = x => x + (LANG === 'en' ? '%' : ' %');
+
+const N = 1440, DT = 1 / 60;
+const EN = 10.24, ETA = 0.95, PMAX = 3.584, PGE = 2, VBAT = 102.4;
+const SOCMIN = 20, SOCMAX = 90, SOCARR = 50, TMIN = 0.25;
+const LAT = 33.57;
+
+const PVM = { Isc: 16.35, Voc: 293, a: 18.25 };
+PVM.I0 = PVM.Isc / (Math.exp(PVM.Voc / PVM.a) - 1);
+const pvI = (V, G) => PVM.Isc * G / 1000 - PVM.I0 * (Math.exp(V / PVM.a) - 1);
+const MPP = [];
+for (let G = 0; G <= 1200; G += 10) {
+  let best = [0, 0];
+  for (let V = 100; V <= 300; V += 0.5) { const P = V * pvI(V, G); if (P > best[1]) best = [V, P]; }
+  MPP.push({ G, V: best[0], P: best[1] / 1000 });
+}
+function gFromP(p) {
+  if (p <= 0.001) return 0;
+  for (let i = 1; i < MPP.length; i++) if (MPP[i].P >= p) { const a = MPP[i - 1], b = MPP[i], f = (p - a.P) / (b.P - a.P); return a.G + f * (b.G - a.G); }
+  return 1200;
+}
+function mppAt(G) { G = Math.max(0, Math.min(1199, G)); const i = Math.floor(G / 10), f = G / 10 - i, a = MPP[i], b = MPP[i + 1]; return { V: a.V + f * (b.V - a.V), P: a.P + f * (b.P - a.P) }; }
+
+const SEASON = { dec: { fr: 'Jour moyen de décembre', en: 'Average December day', decl: -23.3, noonUtc: 12.43 }, jul: { fr: 'Jour clair de juillet', en: 'Clear July day', decl: 21.6, noonUtc: 12.61 } };
+const PV_DEC = [0,0,0,0,0,0,0,0,0.504,1.189,1.711,2.063,2.153,2.087,1.870,1.508,0.942,0.076,0,0,0,0,0,0];
+const LOAD = [0.15,0.15,0.15,0.15,0.15,0.15,1,1,1,0.3,0.3,0.3,0.5,0.5,0.3,0.3,0.3,0.3,1,1,0.7,0.7,0.15,0.15];
+const rad = Math.PI / 180;
+function sunVec(season, hLocal) {
+  const s = SEASON[season], H = 15 * (hLocal - 1 - s.noonUtc) * rad, d = s.decl * rad, p = LAT * rad;
+  return { north: Math.sin(d) * Math.cos(p) - Math.cos(d) * Math.sin(p) * Math.cos(H), up: Math.sin(d) * Math.sin(p) + Math.cos(d) * Math.cos(p) * Math.cos(H) };
+}
+const elev = (season, h) => Math.asin(Math.max(-1, Math.min(1, sunVec(season, h).up))) / rad;
+function clearSkyP(season, h) {
+  const v = sunVec(season, h); if (v.up <= 0.01) return 0;
+  const zd = Math.acos(v.up) / rad, AM = 1 / (v.up + 0.50572 * Math.pow(96.07995 - zd, -1.6364));
+  const dni = 1353 * Math.pow(0.7, Math.pow(AM, 0.678)), b = 30 * rad;
+  const cosi = Math.max(0, -v.north * Math.sin(b) + v.up * Math.cos(b));
+  return mppAt(dni * cosi + 0.1 * dni * (1 + Math.cos(b)) / 2).P;
+}
+const PVBASE = { dec: new Float32Array(N), jul: new Float32Array(N) };
+(function () {
+  let eM = 0, eD = 0;
+  for (let k = 0; k < N; k++) {
+    const h = k * DT, t = h - 1, i = Math.floor(t), f = t - i, g = j => (j >= 0 && j < 24) ? PV_DEC[j] : 0;
+    PVBASE.dec[k] = Math.max(0, g(i) * (1 - f) + g(i + 1) * f);
+    eD += PVBASE.dec[k] * DT; eM += clearSkyP('dec', h) * DT;
+  }
+  const c = eD / eM;
+  for (let k = 0; k < N; k++) PVBASE.jul[k] = c * clearSkyP('jul', k * DT);
+})();
+
+const PRESETS = [
+  { id: 'clair', name: ['Hiver ensoleillé', 'Sunny winter day'], desc: ['Réseau présent. La batterie se charge l\'après-midi et alimente la soirée.', 'Grid present. The battery charges in the afternoon and supplies the evening.'],
+    season: 'dec', cloud: 0, cons: 1, soc0: 50, events: [], film: ['Journée d\'hiver, réseau présent.', 'Winter day, grid present.'] },
+  { id: 'soir', name: ['Jour voilé, panne le soir', 'Overcast day, evening outage'], desc: ['Ciel couvert, coupure à 17 h 30, îlotage puis démarrage automatique du groupe.', 'Overcast sky, outage at 5:30 pm, islanding then automatic genset start.'],
+    season: 'dec', cloud: 0.55, cons: 1, soc0: 40, events: [{ type: 'outage', a: 1050, b: N }], film: ['Ciel couvert, coupure du réseau à 17 h 30.', 'Overcast sky, grid outage at 5:30 pm.'] },
+  { id: 'tempete', name: ['Tempête, 24 h sans réseau', 'Storm, 24 h without grid'], desc: ['Batterie à 30 % à minuit, réseau absent toute la journée.', 'Battery at 30% at midnight, no grid all day.'],
+    season: 'dec', cloud: 0.2, cons: 1, soc0: 30, events: [{ type: 'outage', a: 0, b: N }], film: ['Batterie à 30 % à minuit, pas de réseau de la journée.', 'Battery at 30% at midnight, no grid all day.'] },
+  { id: 'ete', name: ['Été, climatisation', 'Summer, air conditioning'], desc: ['Juillet, climatiseur de 1,2 kW de 14 h à 18 h, couvert par le solaire.', 'July, 1.2 kW air conditioner from 2 pm to 6 pm, covered by solar.'],
+    season: 'jul', cloud: 0, cons: 1, soc0: 50, events: [{ type: 'load', a: 840, b: 1080, p: 1.2, label: ['Climatisation en marche, +1,2 kW jusqu\'à 18 h.', 'Air conditioning on, +1.2 kW until 6 pm.'] }], film: ['Juillet, climatisation l\'après-midi.', 'July, air conditioning in the afternoon.'] }
+];
+const state = { season: 'dec', cloud: 0, cons: 1, soc0: 50, events: [], preset: 'clair', k: 780, playing: false, speed: 1, film: false };
+let R = null, EV = [], lastMode = null, lastGridOk = null, lastGe = null;
+const $ = id => document.getElementById(id);
+
+let skyMode = null, P = {};
+const hx = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+const alpha = (h, a) => { if (!h || h[0] !== '#') return h; return 'rgba(' + hx(h).join(',') + ',' + a + ')'; };
+function readPal() {
+  const cs = getComputedStyle(ROOT), g = n => cs.getPropertyValue('--' + n).trim();
+  P = { solar: g('solar'), battery: g('battery'), grid: g('grid'), genset: g('genset'), shed: g('shed'), cloud: g('cloud'),
+        ink: g('ink'), ink2: g('ink-2'), muted: g('muted'), line: g('line'), line2: g('line-2'), panel: g('panel'), bg: g('bg') };
+}
+function applyMode(m) { ROOT.dataset.sky = m; readPal(); base = null; window.dispatchEvent(new Event('skymode')); }
+function setMode(m) {
+  if (m === skyMode) return;
+  const first = skyMode === null; skyMode = m;
+  if (first || reduceMotion || !document.startViewTransition || document.hidden) { applyMode(m); return; }
+  document.startViewTransition(() => applyMode(m));
+}
+
+function pvPath(w, h, pad) {
+  let d = '';
+  for (let V = 0; V <= 293; V += 3) { const p = V * pvI(V, 1000) / 1000; if (p < 0) break; const x = pad + (w - 2 * pad) * V / 293, y = h - pad - (h - 2 * pad) * p / 3.8; d += (d ? 'L' : 'M') + x.toFixed(1) + ' ' + y.toFixed(1); }
+  return d + 'L' + (w - pad) + ' ' + (h - pad);
+}
+document.querySelectorAll('svg.pvmini').forEach(s => {
+  const NS = 'http://www.w3.org/2000/svg', p = document.createElementNS(NS, 'path'), b = document.createElementNS(NS, 'path'), c = document.createElementNS(NS, 'circle');
+  b.setAttribute('d', 'M2 32 H94 M2 2 V32'); b.setAttribute('fill', 'none'); b.setAttribute('stroke', 'var(--line)'); b.setAttribute('stroke-width', '1');
+  p.setAttribute('d', pvPath(96, 34, 2)); p.setAttribute('fill', 'none'); p.setAttribute('stroke', 'var(--solar)'); p.setAttribute('stroke-width', '1.6'); p.setAttribute('stroke-linejoin', 'round');
+  const m = mppAt(1000); c.setAttribute('cx', (2 + 92 * m.V / 293).toFixed(1)); c.setAttribute('cy', (32 - 30 * m.P / 3.8).toFixed(1)); c.setAttribute('r', '2.2'); c.setAttribute('fill', 'var(--ink)');
+  s.appendChild(b); s.appendChild(p); s.appendChild(c);
+});
+
+function profiles() {
+  const gridOk = new Uint8Array(N).fill(1), cloudEv = new Float32Array(N), extra = new Float32Array(N);
+  for (const e of state.events) for (let k = Math.max(0, e.a); k < Math.min(N, e.b); k++) {
+    if (e.type === 'outage') gridOk[k] = 0;
+    if (e.type === 'cloud') cloudEv[k] = Math.max(cloudEv[k], e.f);
+    if (e.type === 'load') extra[k] += e.p;
+  }
+  return { gridOk, cloudEv, extra };
+}
+function simulate(noBattery) {
+  const Pr = profiles(), A = () => new Float32Array(N);
+  const o = { pvA: A(), pv: A(), load: A(), dem: A(), bat: A(), grid: A(), ge: A(), cur: A(), shed: A(), soc: A(), mode: new Uint8Array(N), gridOk: Pr.gridOk, extra: Pr.extra, cloudEv: Pr.cloudEv };
+  let soc = state.soc0, geOn = false, tStart = 0;
+  for (let k = 0; k < N; k++) {
+    const h = k * DT;
+    const pvA = PVBASE[state.season][k] * (1 - state.cloud) * (1 - Pr.cloudEv[k]);
+    const dem = LOAD[Math.floor(h)] * state.cons + Pr.extra[k];
+    const net = dem - pvA;
+    const disMax = noBattery ? 0 : Math.min(PMAX, Math.max(0, (soc - SOCMIN) / 100 * EN * ETA / DT));
+    const chMax = noBattery ? 0 : Math.min(PMAX, Math.max(0, (SOCMAX - soc) / 100 * EN / ETA / DT));
+    let bat = 0, grid = 0, ge = 0, cur = 0, shed = 0, mode = 1;
+    if (Pr.gridOk[k]) {
+      geOn = false;
+      bat = net > 0 ? Math.min(net, disMax) : -Math.min(-net, chMax);
+      grid = net - bat;
+    } else {
+      if (noBattery) geOn = net > 0;
+      else if (!geOn && soc <= SOCMIN + 0.05) { geOn = true; tStart = h; }
+      else if (geOn && soc >= SOCARR && h - tStart >= TMIN) geOn = false;
+      if (geOn) {
+        mode = 3;
+        bat = net - PGE;
+        bat = bat < 0 ? -Math.min(-bat, chMax) : Math.min(bat, disMax);
+        ge = net - bat;
+        if (ge > PGE) { shed = ge - PGE; ge = PGE; mode = 4; }
+        if (ge < 0) { cur = -ge; ge = 0; }
+      } else {
+        mode = 2;
+        if (net >= 0) { bat = Math.min(net, disMax); shed = net - bat; if (shed > 1e-4) mode = 4; else shed = 0; }
+        else { bat = -Math.min(-net, chMax); cur = -net + bat; if (cur < 1e-4) cur = 0; }
+      }
+    }
+    soc -= (bat < 0 ? bat * ETA : bat / ETA) / EN * 100 * DT;
+    soc = Math.min(100, Math.max(0, soc));
+    o.pvA[k] = pvA; o.pv[k] = pvA - cur; o.dem[k] = dem; o.load[k] = dem - shed; o.bat[k] = bat; o.grid[k] = grid;
+    o.ge[k] = ge; o.cur[k] = cur; o.shed[k] = shed; o.soc[k] = noBattery ? 0 : soc; o.mode[k] = mode;
+  }
+  const S = (arr, f = x => x) => { let s = 0; for (let k = 0; k < N; k++) s += f(arr[k]); return s * DT; };
+  const t = {};
+  t.pvA = S(o.pvA); t.pv = S(o.pv); t.cur = S(o.cur); t.dem = S(o.dem); t.shed = S(o.shed);
+  t.imp = S(o.grid, x => Math.max(0, x)); t.exp = S(o.grid, x => Math.max(0, -x)); t.ege = S(o.ge);
+  t.geH = S(o.ge, x => x > 0 ? 1 : 0);
+  t.fuel = S(o.ge, x => x > 0 ? 0.246 * x + 0.08415 * PGE : 0);
+  let st = 0; for (let k = 0; k < N; k++) if (o.ge[k] > 0 && (k === 0 || o.ge[k - 1] === 0)) st++; t.starts = st;
+  t.shedH = S(o.shed, x => x > 1e-4 ? 1 : 0);
+  t.aut = t.dem > 0 ? Math.max(0, 1 - (t.imp + t.ege + t.shed) / t.dem) : 1;
+  t.selfc = t.pvA > 0 ? Math.max(0, (t.pv - t.exp) / t.pvA) : 0;
+  o.tot = t;
+  return o;
+}
+
+const COL = { solar: 'var(--solar)', battery: 'var(--battery)', grid: 'var(--grid)', genset: 'var(--genset)', ink: 'var(--ink)', shed: 'var(--shed)', cloud: 'var(--cloud)' };
+const canvasCol = v => { const m = /--([a-z]+)/.exec(v || ''); return m && P[m[1]] ? P[m[1]] : P.ink; };
+function detect() {
+  const ev = [], last = {};
+  const add = (k, type, col, text, gap = 0) => { if (gap && last[type] !== undefined && k - last[type] < gap) return; last[type] = k; ev.push({ k, type, col, text }); };
+  let rise = -1, set = -1;
+  for (let k = 0; k < N; k++) if (R.pvA[k] > 0.03) { if (rise < 0) rise = k; set = k; }
+  if (rise >= 0) add(rise, 'rise', COL.solar, L('Lever du soleil, début de la production PV.', 'Sunrise, PV production starts.'));
+  if (set >= 0) add(set, 'set', COL.solar, L('Coucher du soleil, fin de la production PV.', 'Sunset, PV production stops.'));
+  for (const e of state.events) {
+    if (e.type === 'cloud' && e.a < N) add(e.a, 'cloudE', COL.cloud, L('Passage nuageux, production réduite de 75 % pendant 45 min.', 'Passing cloud, production reduced by 75% for 45 min.'));
+    if (e.type === 'load' && e.a < N) add(e.a, 'loadE', COL.ink, L(e.label[0], e.label[1]));
+  }
+  if (!R.gridOk[0]) add(0, 'cut', COL.grid, L('Réseau absent dès minuit, fonctionnement en îlot sur batterie.', 'No grid from midnight, islanded operation on battery.'));
+  for (let k = 1; k < N; k++) {
+    const p = k - 1;
+    if (R.gridOk[p] && !R.gridOk[k]) add(k, 'cut', COL.grid, L('Coupure du réseau. Kr s\'ouvre, l\'onduleur forme la tension 230 V, 50 Hz.', 'Grid outage. Kr opens, the inverter forms the 230 V, 50 Hz voltage.'));
+    if (!R.gridOk[p] && R.gridOk[k]) add(k, 'back', COL.grid, L('Retour du réseau. Resynchronisation de la PLL, fermeture de Kr.', 'Grid restored. The PLL resynchronises, Kr closes.'));
+    if (R.ge[k] > 0 && R.ge[p] === 0) add(k, 'geOn', COL.genset, L('SOC à 20 % sans réseau. Démarrage du groupe, recharge de la batterie.', 'SOC at 20% without grid. The genset starts and recharges the battery.'));
+    if (R.ge[k] === 0 && R.ge[p] > 0 && !R.gridOk[k]) add(k, 'geOff', COL.genset, L('SOC remonté à 50 %, arrêt du groupe.', 'SOC back to 50%, the genset stops.'));
+    if (R.soc[k] >= SOCMAX - 0.02 && R.soc[p] < SOCMAX - 0.02)
+      add(k, 'full', COL.battery, R.gridOk[k] ? L('SOC à 90 %, le surplus PV est injecté au réseau.', 'SOC at 90%, the PV surplus is exported to the grid.') : L('SOC à 90 % sans réseau, le MPPT quitte le maximum pour limiter la production.', 'SOC at 90% without grid, the MPPT leaves the maximum to curtail production.'));
+    if (R.soc[k] <= SOCMIN + 0.02 && R.soc[p] > SOCMIN + 0.02 && R.gridOk[k]) add(k, 'low', COL.battery, L('SOC à 20 %, batterie protégée, le réseau alimente la maison.', 'SOC at 20%, battery protected, the grid supplies the house.'));
+    if (R.bat[k] < -0.05 && R.bat[p] >= -0.05 && R.ge[k] === 0) add(k, 'chg', COL.battery, L('Production supérieure à la consommation, charge de la batterie.', 'Production above consumption, battery charging.'), 120);
+    if (R.bat[k] > 0.05 && R.bat[p] <= 0.05 && R.ge[k] === 0) add(k, 'dis', COL.battery, L('Consommation supérieure à la production, décharge de la batterie.', 'Consumption above production, battery discharging.'), 120);
+    if (R.shed[k] > 1e-4 && R.shed[p] <= 1e-4) add(k, 'shed', COL.shed, L('Délestage, la demande dépasse la puissance disponible.', 'Load shedding, demand exceeds available power.'), 60);
+  }
+  ev.sort((a, b) => a.k - b.k);
+  return ev;
+}
+
+const fr = (x, d = 2) => (Math.abs(x) < 0.5 * Math.pow(10, -d) ? 0 : x).toLocaleString(loc(), { minimumFractionDigits: d, maximumFractionDigits: d });
+const kw = x => fr(Math.abs(x), 2) + ' kW';
+const hhmm = k => String(Math.floor(k / 60) % 24).padStart(2, '0') + ':' + String(k % 60).padStart(2, '0');
+const hm = hours => { const m = Math.round(hours * 60); return Math.floor(m / 60) + ' h ' + String(m % 60).padStart(2, '0') + L('', ' min'); };
+const MODES = { 1: [['Raccordé', 'Grid-connected'], 'var(--grid)', ['mode 1, raccordé au réseau', 'mode 1, grid-connected']], 2: [['Îlotage sur batterie', 'Islanded on battery'], 'var(--battery)', ['mode 2, îlotage', 'mode 2, islanded']], 3: [['Secours par le groupe', 'Genset backup'], 'var(--genset)', ['mode 3, secours groupe', 'mode 3, genset backup']], 4: [['Délestage', 'Load shedding'], 'var(--shed)', ['mode 4, délestage', 'mode 4, load shedding']] };
+function rule(k) {
+  const m = R.mode[k], bat = R.bat[k], g = R.grid[k];
+  if (m === 1) {
+    if (bat > 0.02) return L('déficit, SOC > 20 % → la batterie fournit', 'deficit, SOC > 20% → battery supplies');
+    if (bat < -0.02) return L('surplus, SOC < 90 % → la batterie stocke', 'surplus, SOC < 90% → battery stores');
+    if (g > 0.02) return L('SOC = 20 % → batterie protégée, achat', 'SOC = 20% → battery protected, import');
+    if (g < -0.02) return L('SOC = 90 % → vente du surplus', 'SOC = 90% → surplus exported');
+    return L('équilibre, aucun échange', 'balanced, no exchange');
+  }
+  if (m === 2) return R.cur[k] > 0.02 ? L('îlot, SOC = 90 % → production bridée', 'island, SOC = 90% → production curtailed') : L('îlot, SOC > 20 % → batterie seule', 'island, SOC > 20% → battery only');
+  if (m === 3) return L('SOC ≤ 20 % → groupe jusqu\'à 50 %', 'SOC ≤ 20% → genset until 50%');
+  return L('demande > disponible → délestage', 'demand > available → load shedding');
+}
+function story(k) {
+  const src = [], snk = [];
+  if (R.pv[k] > 0.02) src.push(L('PV ', 'PV ') + kw(R.pv[k]));
+  if (R.bat[k] > 0.02) src.push(L('batterie ', 'battery ') + kw(R.bat[k]));
+  if (R.grid[k] > 0.02) src.push(L('réseau ', 'grid ') + kw(R.grid[k]));
+  if (R.ge[k] > 0.02) src.push(L('groupe ', 'genset ') + kw(R.ge[k]));
+  if (R.bat[k] < -0.02) snk.push(L('charge batterie ', 'battery charging ') + kw(-R.bat[k]));
+  if (R.grid[k] < -0.02) snk.push(L('injection réseau ', 'grid export ') + kw(-R.grid[k]));
+  if (R.cur[k] > 0.02) snk.push(L('production bridée ', 'curtailed production ') + kw(R.cur[k]));
+  let s = L('Consommation ', 'Load ') + kw(R.load[k]) + (src.length ? L(', sources : ', ', sources: ') + src.join(', ') + '.' : '.');
+  if (snk.length) s += ' ' + snk.join(', ').replace(/^./, c => c.toUpperCase()) + '.';
+  if (R.shed[k] > 1e-4) s += ' ' + L('Délestage ', 'Load shed ') + kw(R.shed[k]) + '.';
+  return s;
+}
+
+const NS = 'http://www.w3.org/2000/svg';
+const mk = (tag, attrs, parent) => { const e = document.createElementNS(NS, tag); for (const a in attrs) e.setAttribute(a, attrs[a]); if (parent) parent.appendChild(e); return e; };
+const skyX = k => 30 + 940 * k / N;
+const skyY = e => 102 - 52 * Math.max(-0.12, Math.sin(e * rad)) / Math.sin(82 * rad);
+(function () {
+  const hg = $('hours');
+  for (let h = 0; h <= 24; h += 3) { const x = skyX(h * 60); mk('line', { x1: x, y1: 105, x2: x, y2: 110, class: 'sv-thin' }, hg); mk('text', { x, y: 122, 'text-anchor': 'middle', class: 'sv-ms', style: 'font-size:10px' }, hg).textContent = String(h).padStart(2, '0') + ' h'; }
+  let seed = 11; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const g = $('svgStars');
+  for (let i = 0; i < 40; i++) mk('circle', { cx: (24 + rnd() * 952).toFixed(1), cy: (44 + rnd() * 58).toFixed(1), r: (0.6 + rnd()).toFixed(2), fill: '#f2f4fa', opacity: (0.35 + rnd() * 0.6).toFixed(2) }, g);
+})();
+function drawSunPath() {}
+const CLOUDS = [];
+(function () {
+  let sd = 7; const rn = () => (sd = (sd * 16807) % 2147483647) / 2147483647;
+  for (let i = 0; i < 12; i++) {
+    const g = mk('g', { opacity: 0 }, $('clouds')), w = 26 + rn() * 34, parts = [];
+    for (let j = 0; j < 6; j++) { const t = j / 5; parts.push(mk('ellipse', { cx: (-w + 2 * w * t).toFixed(1), cy: (-Math.sin(Math.PI * t) * (6 + rn() * 6)).toFixed(1), rx: (w * (.32 + rn() * .18)).toFixed(1), ry: (6 + rn() * 5 + Math.sin(Math.PI * t) * 4).toFixed(1) }, g)); }
+    CLOUDS.push({ g, parts, x: rn() * 1000, y: 54 + rn() * 34, v: 6 + rn() * 9, th: i / 12 });
+  }
+})();
+const SKY = [
+  [-14, [10, 16, 32], [22, 30, 54]],
+  [-7, [26, 34, 70], [70, 62, 104]],
+  [-2, [58, 76, 128], [233, 138, 92]],
+  [3, [104, 146, 204], [246, 189, 128]],
+  [12, [116, 168, 220], [206, 226, 240]],
+  [40, [92, 152, 216], [196, 222, 242]]
+];
+const mixc = (a, b, t) => a.map((v, i) => Math.round(v + (b[i] - v) * t));
+const rgbs = c => 'rgb(' + c.join(',') + ')';
+function skyCols(e, cl) {
+  let i = 0; while (i < SKY.length - 2 && e > SKY[i + 1][0]) i++;
+  const A = SKY[i], B = SKY[i + 1], t = Math.max(0, Math.min(1, (e - A[0]) / (B[0] - A[0])));
+  let top = mixc(A[1], B[1], t), bot = mixc(A[2], B[2], t);
+  const grey = e > -2 ? [150, 158, 168] : [44, 50, 62];
+  return [mixc(top, grey, cl * 0.75), mixc(bot, grey, cl * 0.6)];
+}
+function weatherTxt(e, cl, k) {
+  const c = cl < 0.15 ? L('ciel dégagé', 'clear sky') : cl < 0.45 ? L('passages nuageux', 'partly cloudy') : cl < 0.7 ? L('ciel voilé', 'overcast') : L('ciel couvert', 'heavy cloud');
+  if (e <= 0) return L('Nuit, ', 'Night, ') + c;
+  const G = Math.round(gFromP(R.pvA[k]));
+  return c.charAt(0).toUpperCase() + c.slice(1) + ' · ' + G + ' W/m² · ' + L('soleil à ', 'sun at ') + fr(e, 0) + '°';
+}
+const PUFFS = [];
+for (let i = 0; i < 4; i++) PUFFS.push({ c: mk('circle', { r: 4, class: 'puff', opacity: 0 }, $('puffs')), t: i / 4 });
+const FLOW = ['pv', 'bat', 'dc', 'grid', 'load', 'ge'].map(id => ({ id, els: [$('F_' + id), $('F_' + id + '_m')].filter(Boolean), off: 0 }));
+function animateFlows(k, dt) {
+  const v = { pv: R.pv[k], bat: R.bat[k], dc: R.pv[k] + R.bat[k], grid: -R.grid[k], load: R.load[k], ge: -R.ge[k] };
+  for (const F of FLOW) {
+    const p = v[F.id], m = Math.abs(p);
+    if (m < 0.015) { F.els.forEach(el => { el.style.strokeWidth = '0'; }); continue; }
+    const sw = (3 + 9 * Math.min(1, m / 3.6)).toFixed(1);
+    if (!reduceMotion) F.off -= Math.sign(p) * dt * (34 + 30 * Math.min(1, m / 3.6));
+    F.els.forEach(el => { el.style.strokeWidth = sw; el.style.strokeDashoffset = F.off.toFixed(1); });
+  }
+}
+
+function fitCanvas(cv, h) {
+  const r = cv.getBoundingClientRect(), d = window.devicePixelRatio || 1;
+  cv.style.height = h + 'px';
+  cv.width = Math.max(1, Math.round(r.width * d)); cv.height = Math.round(h * d);
+  const c = cv.getContext('2d'); c.setTransform(d, 0, 0, d, 0, 0); return { c, w: r.width, h };
+}
+let PVC, SCP, CH;
+const MONO = '"B612 Mono", ui-monospace, monospace';
+function drawPV(k, tReal) {
+  const { c, w, h } = PVC; c.clearRect(0, 0, w, h);
+  const l = 40, r = 8, t = 8, b = 20, X = V => l + (w - l - r) * V / 300, Y = p => t + (h - t - b) * (1 - p / 4);
+  c.font = '10px ' + MONO; c.lineWidth = 1;
+  for (let p = 0; p <= 4; p++) { c.strokeStyle = P.line2; c.beginPath(); c.moveTo(l, Y(p)); c.lineTo(w - r, Y(p)); c.stroke(); c.fillStyle = P.muted; c.textAlign = 'right'; c.fillText(p + ' kW', l - 4, Y(p) + 3); }
+  c.textAlign = 'center'; for (let V = 0; V <= 300; V += 100) c.fillText(V + ' V', X(V), h - 5);
+  const curve = (G, col, wd, dash) => { c.beginPath(); let s = false; for (let V = 0; V <= 300; V += 2) { const pp = V * pvI(V, G) / 1000; if (pp < 0) break; s ? c.lineTo(X(V), Y(pp)) : c.moveTo(X(V), Y(pp)); s = true; } c.strokeStyle = col; c.lineWidth = wd; c.setLineDash(dash || []); c.stroke(); c.setLineDash([]); };
+  curve(1000, P.line, 1, [3, 3]);
+  c.fillStyle = P.muted; c.textAlign = 'right'; c.fillText('1000 W/m²', X(232), Y(3.85));
+  const G = gFromP(R.pvA[k]);
+  setTxt('gTxt', Math.round(G) + ' W/m² ' + L('équivalent', 'equivalent'));
+  if (G < 5) { setTxt('pvCapt', L('Nuit, pas de production. Hacheur à l\'arrêt.', 'Night, no production. Chopper stopped.')); return; }
+  curve(G, P.solar, 2);
+  const m = mppAt(G);
+  let V = m.V, Pw = m.P;
+  if (R.cur[k] > 0.02) {
+    for (let v = m.V; v < 300; v += 0.25) { const p = v * pvI(v, G) / 1000; if (p <= R.pv[k]) { V = v; Pw = Math.max(0, p); break; } }
+    setTxt('pvCapt', L('Batterie pleine en îlot. Le MPPT s\'écarte du maximum (' + fr(V, 0) + ' V) et limite la production à ' + kw(Pw) + '.', 'Battery full while islanded. The MPPT moves off the maximum (' + fr(V, 0) + ' V) and limits production to ' + kw(Pw) + '.'));
+  } else {
+    const step = reduceMotion ? 0 : [-2, 0, 2, 0][Math.floor(tReal * 6) % 4];
+    V = m.V + step; Pw = V * pvI(V, G) / 1000;
+    setTxt('pvCapt', L('Oscillation P&O de ±2 V autour du maximum, ' + fr(m.V, 0) + ' V, ' + kw(m.P) + '.', 'P&O oscillation of ±2 V around the maximum, ' + fr(m.V, 0) + ' V, ' + kw(m.P) + '.'));
+  }
+  c.strokeStyle = P.ink2; c.lineWidth = 1; c.setLineDash([2, 2]);
+  c.beginPath(); c.moveTo(X(V), Y(0)); c.lineTo(X(V), Y(Pw)); c.lineTo(l, Y(Pw)); c.stroke(); c.setLineDash([]);
+  c.fillStyle = P.ink; c.beginPath(); c.arc(X(V), Y(Pw), 4, 0, 7); c.fill();
+}
+function drawScope(k, tReal) {
+  const { c, w, h } = SCP; c.clearRect(0, 0, w, h);
+  const l = 6, r = 6, mid = h / 2, A = h / 2 - 16;
+  c.strokeStyle = P.line2; c.lineWidth = 1; c.beginPath(); c.moveTo(l, mid); c.lineTo(w - r, mid); c.stroke();
+  for (let i = 1; i < 4; i++) { const x = l + (w - l - r) * i / 4; c.beginPath(); c.moveTo(x, 4); c.lineTo(x, h - 4); c.stroke(); }
+  const Pinv = R.pv[k] + R.bat[k];
+  const Ipk = Math.SQRT2 * Math.abs(Pinv) * 1000 / 230, ph = reduceMotion ? 0 : tReal * 2 * Math.PI * 0.6, sg = Pinv >= 0 ? 1 : -1;
+  const trace = (amp, col, wd, s) => { c.beginPath(); for (let i = 0; i <= 200; i++) { const x = l + (w - l - r) * i / 200, th = 4 * Math.PI * i / 200 - ph, y = mid - amp * s * Math.sin(th); i ? c.lineTo(x, y) : c.moveTo(x, y); } c.strokeStyle = col; c.lineWidth = wd; c.stroke(); };
+  trace(A, P.ink2, 1.4, 1);
+  if (Ipk > 0.3) trace(A * Math.min(1, Ipk / 25), P.battery, 2.4, sg);
+  c.font = '10px ' + MONO; c.textAlign = 'left';
+  c.fillStyle = P.ink2; c.fillText('v : 325 V ' + L('crête', 'peak'), l + 2, 11);
+  c.fillStyle = P.battery; c.fillText(L('i onduleur : ', 'i inverter: ') + fr(Ipk, 1) + ' A ' + L('crête', 'peak'), l + 2, h - 3);
+  const island = !R.gridOk[k];
+  const who = island ? L('Tension imposée par l\'onduleur (formeur de réseau)', 'Voltage set by the inverter (grid-forming)') : L('Tension imposée par le réseau, suivie par la PLL', 'Voltage set by the grid, tracked by the PLL');
+  const what = Ipk < 0.3 ? L('courant quasi nul.', 'near-zero current.') : Pinv >= 0 ? L('courant en phase, ' + kw(Pinv) + ' fournis.', 'current in phase, ' + kw(Pinv) + ' supplied.') : L('courant en opposition, ' + kw(-Pinv) + ' absorbés pour la batterie.', 'current in antiphase, ' + kw(-Pinv) + ' absorbed for the battery.');
+  setTxt('scopeCapt', who + ', ' + what);
+}
+
+let base = null, G = null;
+function chartGeom() {
+  const w = CH.w, h = CH.h, l = 46, r = 44, t = 26, socH = 46, gap = 14, b = 22;
+  let mx = 1, mn = 0;
+  for (let k = 0; k < N; k++) {
+    const pos = R.pv[k] + Math.max(0, R.bat[k]) + Math.max(0, R.grid[k]) + R.ge[k], neg = Math.max(0, -R.bat[k]) + Math.max(0, -R.grid[k]);
+    mx = Math.max(mx, pos, R.pvA[k], R.load[k]); mn = Math.max(mn, neg);
+  }
+  mx = Math.ceil(mx + 0.15); mn = Math.ceil(mn);
+  const top = t, bot = h - b - socH - gap;
+  return { w, h, l, r, t, b, mx, mn, top, bot, socTop: h - b - socH, socBot: h - b,
+    X: k => l + (w - l - r) * k / (N - 1), Y: p => top + (bot - top) * (mx - p) / (mx + mn), S: s => (h - b - socH) + socH * (1 - s / 100) };
+}
+function buildBase() {
+  G = chartGeom();
+  const d = window.devicePixelRatio || 1, off = document.createElement('canvas');
+  off.width = Math.max(1, Math.round(CH.w * d)); off.height = Math.round(CH.h * d);
+  const c = off.getContext('2d'); c.setTransform(d, 0, 0, d, 0, 0);
+  const { X, Y, S } = G;
+  const pc = document.createElement('canvas'); pc.width = pc.height = 8; const q = pc.getContext('2d'); q.strokeStyle = P.line; q.lineWidth = 2; q.beginPath(); q.moveTo(0, 8); q.lineTo(8, 0); q.stroke();
+  const hatch = c.createPattern(pc, 'repeat');
+  let a = -1;
+  for (let k = 0; k <= N; k++) { const cut = k < N && !R.gridOk[k]; if (cut && a < 0) a = k; if (!cut && a >= 0) { c.fillStyle = hatch; c.fillRect(X(a), G.top, X(k - 1) - X(a), G.socBot - G.top); a = -1; } }
+  c.font = '10px ' + MONO; c.lineWidth = 1;
+  for (let p = -G.mn; p <= G.mx; p++) { const y = Y(p); c.strokeStyle = p === 0 ? P.ink2 : P.line2; c.beginPath(); c.moveTo(G.l, y); c.lineTo(G.w - G.r, y); c.stroke(); c.fillStyle = P.muted; c.textAlign = 'right'; c.fillText(p + ' kW', G.l - 6, y + 3); }
+  c.textAlign = 'center';
+  for (let hh = 0; hh <= 24; hh += 2) { const x = X(Math.min(N - 1, hh * 60)); c.fillStyle = P.muted; c.fillText(String(hh).padStart(2, '0') + 'h', x, G.h - 6); c.strokeStyle = P.line2; c.beginPath(); c.moveTo(x, G.top); c.lineTo(x, G.socBot); c.stroke(); }
+  const layer = (fn, col) => {
+    c.beginPath();
+    for (let k = 0; k < N; k++) { const [, hi] = fn(k); const x = X(k), y = Y(hi); k ? c.lineTo(x, y) : c.moveTo(x, y); }
+    for (let k = N - 1; k >= 0; k--) { const [lo] = fn(k); c.lineTo(X(k), Y(lo)); }
+    c.closePath(); c.fillStyle = col; c.fill();
+  };
+  const p0 = k => R.pv[k], p1 = k => Math.max(0, R.bat[k]), p2 = k => Math.max(0, R.grid[k]), p3 = k => R.ge[k];
+  layer(k => [0, p0(k)], alpha(P.solar, .8));
+  layer(k => [p0(k), p0(k) + p1(k)], alpha(P.battery, .8));
+  layer(k => [p0(k) + p1(k), p0(k) + p1(k) + p2(k)], alpha(P.grid, .75));
+  layer(k => [p0(k) + p1(k) + p2(k), p0(k) + p1(k) + p2(k) + p3(k)], alpha(P.genset, .82));
+  const n1 = k => Math.max(0, -R.bat[k]), n2 = k => Math.max(0, -R.grid[k]);
+  layer(k => [0, -n1(k)], alpha(P.battery, .35));
+  layer(k => [-n1(k), -n1(k) - n2(k)], alpha(P.grid, .3));
+  c.beginPath(); let on = false;
+  for (let k = 0; k < N; k++) { if (R.cur[k] > 0.02) { const y = Y(R.pvA[k]); on ? c.lineTo(X(k), y) : c.moveTo(X(k), y); on = true; } else on = false; }
+  c.strokeStyle = P.solar; c.setLineDash([3, 3]); c.lineWidth = 1.4; c.stroke(); c.setLineDash([]);
+  c.beginPath(); for (let k = 0; k < N; k++) { const y = Y(R.load[k]); k ? c.lineTo(X(k), y) : c.moveTo(X(k), y); } c.strokeStyle = P.ink; c.lineWidth = 1.7; c.stroke();
+  c.fillStyle = P.ink2; c.textAlign = 'left'; c.font = '600 11px "Funnel Sans", sans-serif';
+  c.fillText(L('sources', 'sources'), G.l + 4, G.top + 10);
+  if (G.mn > 0) c.fillText(L('charge batterie, injection', 'battery charging, export'), G.l + 4, G.bot - 4);
+  c.fillStyle = P.line2; c.fillRect(G.l, G.socTop, G.w - G.l - G.r, G.socBot - G.socTop);
+  c.strokeStyle = P.line; c.setLineDash([3, 3]); [20, 50, 90].forEach(s => { c.beginPath(); c.moveTo(G.l, S(s)); c.lineTo(G.w - G.r, S(s)); c.stroke(); }); c.setLineDash([]);
+  c.font = '10px ' + MONO; c.fillStyle = P.muted; c.textAlign = 'left'; [20, 50, 90].forEach(s => c.fillText(pct(s), G.w - G.r + 6, S(s) + 3));
+  c.textAlign = 'right'; c.fillText('SOC', G.l - 6, S(55) + 3);
+  c.beginPath(); for (let k = 0; k < N; k++) { const y = S(R.soc[k]); k ? c.lineTo(X(k), y) : c.moveTo(X(k), y); } c.strokeStyle = P.battery; c.lineWidth = 2; c.stroke();
+  base = off;
+}
+function drawChart(k) {
+  if (!base) buildBase();
+  const { c } = CH, d = window.devicePixelRatio || 1, { X } = G;
+  c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, base.width, base.height); c.drawImage(base, 0, 0); c.setTransform(d, 0, 0, d, 0, 0);
+  c.fillStyle = alpha(P.panel, .62); c.fillRect(X(k), G.top - 2, G.w - G.r - X(k), G.socBot - G.top + 2);
+  EV.forEach((e, i) => {
+    const x = X(e.k), past = e.k <= k, col = canvasCol(e.col);
+    c.strokeStyle = P.line; c.lineWidth = 1; c.beginPath(); c.moveTo(x, 19); c.lineTo(x, G.socBot); c.stroke();
+    c.fillStyle = past ? col : P.panel; c.strokeStyle = col; c.lineWidth = 1.5; c.beginPath(); c.arc(x, 10, 8, 0, 7); c.fill(); c.stroke();
+    c.fillStyle = past ? P.panel : col; c.font = '500 10px ' + MONO; c.textAlign = 'center'; c.fillText(String(i + 1), x, 13.5);
+  });
+  c.strokeStyle = P.ink; c.lineWidth = 1.4; c.beginPath(); c.moveTo(X(k), G.top - 2); c.lineTo(X(k), G.socBot); c.stroke();
+  c.fillStyle = P.battery; c.beginPath(); c.arc(X(k), G.S(R.soc[k]), 4.5, 0, 7); c.fill();
+  c.fillStyle = P.ink; c.beginPath(); c.arc(X(k), G.Y(R.load[k]), 3.5, 0, 7); c.fill();
+}
+
+function setTxt(id, s) { [$(id), $(id + '_m')].forEach(e => { if (e && e.textContent !== s) e.textContent = s; }); }
+function att(id, a, v) { [$(id), $(id + '_m')].forEach(e => { if (e) e.setAttribute(a, v); }); }
+function pulse(id) { const el = $(id); el.classList.remove('pulse'); void el.getBoundingClientRect(); el.classList.add('pulse'); }
+function render(k) {
+  const h = k * DT, pv = R.pv[k], bat = R.bat[k], grid = R.grid[k], ge = R.ge[k], load = R.load[k], soc = R.soc[k], m = R.mode[k], ok = !!R.gridOk[k];
+  const e = elev(state.season, h), cl = Math.max(state.cloud, R.cloudEv[k]);
+  setMode(e < -1 ? 'night' : 'day');
+  setTxt('time', hhmm(k)); setTxt('stT', hhmm(k));
+  const [mt, mc, ml] = MODES[m]; setTxt('mode', L(mt[0], mt[1])); $('mode').style.color = mc;
+  setTxt('stX', story(k)); setTxt('stR', L('Règle du superviseur : ', 'Supervisor rule: ') + rule(k));
+  setTxt('v_pv', kw(pv)); setTxt('v_bat', kw(bat)); setTxt('v_dc', kw(pv + bat)); setTxt('v_load', kw(load)); setTxt('v_grid', kw(ok ? grid : 0)); setTxt('v_ge', kw(ge));
+  att('batFill', 'width', Math.max(1, 88 * soc / 100).toFixed(1));
+  att('KrBlade', 'transform', ok ? '' : 'rotate(-32)');
+  att('KgeBlade', 'transform', ge > 0 ? '' : 'rotate(32)');
+  setTxt('gridState', ok ? L('présent', 'present') : L('coupé', 'off')); att('gridState', 'style', 'fill:' + (ok ? 'var(--ink-2)' : 'var(--genset)'));
+  att('pylon', 'opacity', ok ? 1 : .35);
+  setTxt('geState', ge > 0 ? L('en marche', 'running') : L('arrêt', 'stopped'));
+  const lit = (h >= 17.5 || h < 7.5) && load > 0.05 ? 'var(--lit)' : 'var(--panel)';
+  att('w1', 'fill', R.shed[k] > 1e-4 ? 'var(--shed)' : lit); att('w2', 'fill', lit);
+  setTxt('loadSub', R.extra[k] > 0 ? L('appareil en marche +', 'appliance on +') + fr(R.extra[k], 1) + ' kW' : fr(10.7 * state.cons, 1) + L(' kWh/jour', ' kWh/day'));
+  if (R.extra[k] > 0) { const lm = $('loadSub_m'); if (lm) lm.textContent = '+' + fr(R.extra[k], 1) + ' kW'; }
+  setTxt('emsMode', L(ml[0], ml[1])); setTxt('emsRule', rule(k));
+  const G0 = gFromP(R.pvA[k]);
+  setTxt('tagPv', G0 > 5 ? 'V* ≈ ' + fr(R.cur[k] > 0.02 ? 280 : mppAt(G0).V, 0) + ' V' : L('à l\'arrêt', 'stopped'));
+  setTxt('tagBat', 'I* = ' + fr(-bat * 1000 / VBAT, 1) + ' A');
+  setTxt('tagInv1', ok ? 'PLL SOGI + PR' : L('Formeur de réseau', 'Grid-forming'));
+  setTxt('tagInv2', ok ? 'V_dc → 400 V' : L('impose 230 V, 50 Hz', 'sets 230 V, 50 Hz'));
+  setTxt('tagGe', ge > 0 ? 'f = ' + fr(50, 1) + ' Hz, ' + kw(ge) : L('au repos', 'idle'));
+  if (lastGridOk !== null && lastGridOk !== ok) pulse('c_kr');
+  if (lastGe !== null && (lastGe > 0) !== (ge > 0)) pulse('c_kge');
+  if (lastMode !== null && lastMode !== m) pulse('c_pb');
+  lastGridOk = ok; lastGe = ge; lastMode = m;
+  const night = Math.max(0, Math.min(1, (-e - 1) / 8)) * (1 - 0.85 * cl);
+  $('svgStars').setAttribute('opacity', night.toFixed(2));
+  const [ct, cb] = skyCols(e, cl);
+  $('sg0').setAttribute('stop-color', rgbs(ct)); $('sg1').setAttribute('stop-color', rgbs(cb));
+  const sx = skyX(k), sy = skyY(e);
+  const glow = Math.max(0, 1 - Math.abs(e) / 9) * (1 - 0.7 * cl);
+  $('horizonGlow').setAttribute('cx', sx.toFixed(1)); $('horizonGlow').setAttribute('opacity', glow.toFixed(2));
+  $('overcast').setAttribute('opacity', (e > -2 ? 0.28 * cl : 0.15 * cl).toFixed(2));
+  $('sun').setAttribute('transform', 'translate(' + sx.toFixed(1) + ',' + sy.toFixed(1) + ')');
+  $('sun').setAttribute('opacity', e > -1 ? (1 - 0.72 * cl).toFixed(2) : 0);
+  $('sunDisc').setAttribute('fill', rgbs(mixc(e < 8 ? [255, 160, 80] : [255, 214, 110], [236, 236, 228], cl * 0.8)));
+  const moonX = skyX((k + 720) % N);
+  $('moon').setAttribute('transform', 'translate(' + moonX.toFixed(1) + ',56)'); $('moon').setAttribute('opacity', e < -6 ? (1 - 0.7 * cl).toFixed(2) : 0);
+  let cRGB = e > -2 ? mixc([255, 255, 255], [128, 136, 148], Math.max(0, cl - 0.3) * 1.4) : [70, 78, 96];
+  if (e > -7 && e < 6) cRGB = mixc(cRGB, [236, 168, 148], (1 - Math.abs(e + 0.5) / 6.5) * 0.55);
+  const cFill = rgbs(cRGB);
+  CLOUDS.forEach(c => c.parts.forEach(pt => pt.setAttribute('fill', cFill)));
+  setTxt('elevTxt', weatherTxt(e, cl, k));
+  $('elevTxt').setAttribute('style', 'font-weight:500;fill:' + (e > -2 ? '#14243d' : '#eef2fa'));
+  const s1 = fr(soc, 1), sep = LANG === 'en' ? '.' : ',', parts = s1.split(sep);
+  $('socBig').innerHTML = parts[0] + '<span>' + sep + parts[1] + (LANG === 'en' ? '%' : ' %') + '</span>';
+  $('socFill').style.width = soc.toFixed(1) + '%';
+  setTxt('batState', bat > 0.02 ? L('décharge', 'discharging') : bat < -0.02 ? L('charge', 'charging') : L('repos', 'idle'));
+  setTxt('batP', (bat > 0.02 ? '−' : bat < -0.02 ? '+' : '') + kw(bat));
+  setTxt('batI', fr(Math.abs(bat) * 1000 / VBAT, 1) + ' A');
+  if (bat > 0.02) { setTxt('autLab', L('Autonomie à ce rythme', 'Runtime at this rate')); setTxt('batAut', hm((soc - SOCMIN) / 100 * EN * ETA / bat)); }
+  else if (bat < -0.02) { setTxt('autLab', L('90 % atteint dans', '90% reached in')); setTxt('batAut', hm((SOCMAX - soc) / 100 * EN / ETA / -bat)); }
+  else { setTxt('autLab', L('Énergie disponible', 'Available energy')); setTxt('batAut', fr(Math.max(0, soc - SOCMIN) / 100 * EN, 1) + ' kWh'); }
+  const lis = $('journal').children; let cur = -1;
+  EV.forEach((ev, i) => { if (ev.k <= k) cur = i; });
+  EV.forEach((ev, i) => { if (lis[i]) lis[i].className = i === cur ? 'now' : ev.k <= k ? 'past' : 'future'; });
+  drawChart(k);
+}
+window.addEventListener('skymode', () => { if (R && CH) drawChart(state.k); });
+
+function summary() {
+  const t = R.tot;
+  setTxt('t_pv', fr(t.pvA, 1) + ' kWh');
+  setTxt('t_pv_s', t.cur > 0.05 ? fr(t.cur, 1) + L(' kWh bridés, batterie pleine', ' kWh curtailed, battery full') : pct(Math.round(t.selfc * 100)) + L(' consommés sur place', ' used on site'));
+  setTxt('t_aut', pct(Math.round(t.aut * 100)));
+  const anyGrid = R.gridOk.some(x => x);
+  setTxt('t_grid', anyGrid ? fr(t.imp, 1) + ' kWh' : L('coupé', 'off'));
+  setTxt('t_grid_s', anyGrid ? L('achetés, ', 'imported, ') + fr(t.exp, 1) + L(' kWh vendus', ' kWh exported') : L('aucun échange possible', 'no exchange possible'));
+  setTxt('t_ge', fr(t.fuel, 2) + ' L');
+  setTxt('t_ge_s', t.starts ? hm(t.geH) + L(' de marche, ', ' running, ') + t.starts + (t.starts > 1 ? L(' démarrages', ' starts') : L(' démarrage', ' start')) : L('aucun démarrage', 'no start'));
+  const NB = simulate(true).tot, parts = [];
+  if (NB.imp - t.imp > 0.05) parts.push(L('achat réseau ' + fr(NB.imp, 1) + ' kWh au lieu de ' + fr(t.imp, 1), 'grid import ' + fr(NB.imp, 1) + ' kWh instead of ' + fr(t.imp, 1)));
+  if (NB.exp - t.exp > 0.05) parts.push(L('vente ' + fr(NB.exp, 1) + ' kWh au lieu de ' + fr(t.exp, 1), 'export ' + fr(NB.exp, 1) + ' kWh instead of ' + fr(t.exp, 1)));
+  if (NB.geH - t.geH > 0.05) parts.push(L('groupe ' + hm(NB.geH) + ' (' + fr(NB.fuel, 1) + ' L) au lieu de ' + hm(t.geH) + ' (' + fr(t.fuel, 1) + ' L)', 'genset ' + hm(NB.geH) + ' (' + fr(NB.fuel, 1) + ' L) instead of ' + hm(t.geH) + ' (' + fr(t.fuel, 1) + ' L)'));
+  if (NB.cur - t.cur > 0.05) parts.push(L(fr(NB.cur, 1) + ' kWh de soleil perdus', fr(NB.cur, 1) + ' kWh of solar lost'));
+  if (NB.shedH - t.shedH > 0.02) parts.push(L(hm(NB.shedH) + ' de délestage', hm(NB.shedH) + ' of load shedding'));
+  setTxt('cfTxt', parts.length ? parts.join(', ').replace(/^./, c => c.toUpperCase()) + '.' : L('Écart négligeable sur cette journée.', 'Negligible difference on this day.'));
+  const ol = $('journal'); ol.innerHTML = '';
+  EV.forEach((e, i) => {
+    const li = document.createElement('li'), b = document.createElement('button'); b.type = 'button';
+    b.innerHTML = '<span class="tt"></span><span class="dd"></span><span class="tx"></span>';
+    b.querySelector('.tt').textContent = (i + 1) + '. ' + hhmm(e.k); b.querySelector('.dd').style.background = e.col; b.querySelector('.tx').textContent = e.text;
+    b.addEventListener('click', () => { state.k = e.k; pause(); render(state.k); syncLive(); });
+    li.appendChild(b); ol.appendChild(li);
+  });
+  setTxt('jCount', EV.length + L(' événements', ' events'));
+}
+
+function recompute() { R = simulate(false); EV = detect(); base = null; summary(); drawSunPath(); setTxt('dayLabel', L(SEASON[state.season].fr, SEASON[state.season].en)); render(state.k); syncLive(); }
+function syncLive() { const cut = !R.gridOk[state.k]; $('evGrid').setAttribute('aria-pressed', String(cut)); setTxt('evGridTxt', cut ? L('Rétablir le réseau', 'Restore grid') : L('Couper le réseau', 'Cut grid')); }
+function markPreset(id) { state.preset = id; document.querySelectorAll('.preset').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.id === id))); }
+function applyPreset(p) { Object.assign(state, { season: p.season, cloud: p.cloud, cons: p.cons, soc0: p.soc0, events: p.events.map(e => Object.assign({}, e)) }); markPreset(p.id); syncInputs(); recompute(); }
+PRESETS.forEach(p => {
+  const b = document.createElement('button'); b.type = 'button'; b.className = 'preset'; b.dataset.id = p.id; b.setAttribute('aria-pressed', 'false');
+  b.innerHTML = '<b></b><span></span>';
+  b.addEventListener('click', () => { state.k = 0; applyPreset(p); play(); });
+  $('presets').appendChild(b);
+});
+function presetTexts() { document.querySelectorAll('.preset').forEach(b => { const p = PRESETS.find(x => x.id === b.dataset.id); b.querySelector('b').textContent = L(p.name[0], p.name[1]); b.querySelector('span').textContent = L(p.desc[0], p.desc[1]); }); }
+function syncInputs() {
+  $('season').value = state.season; $('cloud').value = Math.round(state.cloud * 100); $('cons').value = Math.round(state.cons * 100); $('soc0').value = state.soc0;
+  setTxt('o_cloud', pct(Math.round(state.cloud * 100))); setTxt('o_cons', fr(10.7 * state.cons, 1) + L(' kWh/j', ' kWh/d')); setTxt('o_soc0', pct(state.soc0));
+}
+const custom = () => markPreset(null);
+$('season').addEventListener('change', e => { state.season = e.target.value; custom(); recompute(); });
+$('cloud').addEventListener('input', e => { state.cloud = e.target.value / 100; syncInputs(); custom(); recompute(); });
+$('cons').addEventListener('input', e => { state.cons = e.target.value / 100; syncInputs(); custom(); recompute(); });
+$('soc0').addEventListener('input', e => { state.soc0 = +e.target.value; syncInputs(); custom(); recompute(); });
+$('speed').addEventListener('change', e => { state.speed = +e.target.value; });
+$('restart').addEventListener('click', () => { state.k = 0; render(0); syncLive(); });
+function toggleGrid() {
+  const k = state.k;
+  if (R.gridOk[k]) state.events.push({ type: 'outage', a: k, b: N });
+  else state.events.forEach(e => { if (e.type === 'outage' && e.a <= k && e.b > k) e.b = k; });
+  state.events = state.events.filter(e => e.b > e.a); custom(); recompute();
+}
+const addCloud = () => { state.events.push({ type: 'cloud', a: state.k, b: state.k + 45, f: 0.75 }); custom(); recompute(); };
+const addOven = () => { state.events.push({ type: 'load', a: state.k, b: state.k + 40, p: 2, label: ['Four allumé, +2 kW pendant 40 min.', 'Oven on, +2 kW for 40 min.'] }); custom(); recompute(); };
+$('evGrid').addEventListener('click', toggleGrid);
+$('evCloud').addEventListener('click', addCloud);
+$('evOven').addEventListener('click', addOven);
+$('tglCtl').addEventListener('click', e => { const on = e.currentTarget.getAttribute('aria-pressed') !== 'true'; e.currentTarget.setAttribute('aria-pressed', String(on)); $('sheetbox').classList.toggle('hidectl', !on); });
+function play() { state.playing = true; if (state.k >= N - 1) state.k = 0; setTxt('playTxt', 'Pause'); }
+function pause() { state.playing = false; setTxt('playTxt', L('Lecture', 'Play')); }
+$('play').addEventListener('click', () => state.playing ? pause() : play());
+let drag = false;
+const seek = ev => { const r = $('chart').getBoundingClientRect(); state.k = Math.max(0, Math.min(N - 1, Math.round((ev.clientX - r.left - G.l) / (G.w - G.l - G.r) * (N - 1)))); render(state.k); syncLive(); };
+$('chart').addEventListener('pointerdown', ev => { drag = true; pause(); $('chart').setPointerCapture(ev.pointerId); seek(ev); });
+$('chart').addEventListener('pointermove', ev => { if (drag) seek(ev); });
+$('chart').addEventListener('pointerup', () => { drag = false; });
+document.addEventListener('keydown', ev => {
+  if (ev.target.closest && ev.target.closest('input,select') && ev.key !== 'Escape') return;
+  if (ev.key === ' ' && ev.target.closest && ev.target.closest('button')) return;
+  if (ev.key === 'Escape') { if (state.film) exitFilm(); return; }
+  if (ev.key === ' ') { ev.preventDefault(); state.playing ? pause() : play(); }
+  else if (ev.key === 'ArrowRight') { state.k = Math.min(N - 1, state.k + 10); render(state.k); syncLive(); }
+  else if (ev.key === 'ArrowLeft') { state.k = Math.max(0, state.k - 10); render(state.k); syncLive(); }
+  else if (ev.key === 'c' || ev.key === 'C') toggleGrid();
+  else if (ev.key === 'n' || ev.key === 'N') addCloud();
+  else if (ev.key === 'f' || ev.key === 'F') state.film ? exitFilm() : startFilm();
+});
+
+let filmPhase = null, filmT = 0, capUntil = 0, lastEvIdx = -1;
+function startFilm() {
+  let p = PRESETS.find(x => x.id === state.preset);
+  if (!p) { p = PRESETS[1]; applyPreset(p); }
+  document.body.classList.add('film'); state.film = true; pause();
+  sizeAll(); state.k = 0; render(0); syncLive();
+  setTxt('introK', 'Casablanca, ' + (state.season === 'dec' ? L('décembre', 'December') : L('juillet', 'July')) + ', ' + L(p.name[0], p.name[1]).toLowerCase());
+  setTxt('introP', L(p.film[0], p.film[1]) + ' ' + L('Le superviseur choisit chaque minute les sources qui alimentent la maison.', 'Every minute the supervisor chooses which sources supply the house.'));
+  $('intro').classList.add('on'); filmPhase = 'intro'; filmT = 0; lastEvIdx = -1; capUntil = 0;
+}
+function exitFilm() {
+  document.body.classList.remove('film'); state.film = false; filmPhase = null; pause();
+  $('intro').classList.remove('on'); $('outro').classList.remove('on'); $('cap').classList.remove('on'); sizeAll(); render(state.k);
+}
+function outro() {
+  const t = R.tot, nb = simulate(true).tot; filmPhase = 'outro'; pause();
+  setTxt('outroH', t.shed < 0.01 ? L('Aucune minute sans électricité', 'No minute without power') : hm(t.shedH) + L(' de délestage', ' of load shedding'));
+  const row = $('outroRow'); row.innerHTML = '';
+  [[fr(t.pvA, 1) + ' kWh', L('de production solaire', 'of solar production')], [pct(Math.round(t.aut * 100)), L('d\'autonomie', 'self-sufficiency')], [fr(t.fuel, 1) + ' L', L('de gasoil', 'of diesel')], [String(t.starts), t.starts > 1 ? L('démarrages du groupe', 'genset starts') : L('démarrage du groupe', 'genset start')]]
+    .forEach(([b, s]) => { const d = document.createElement('div'); d.innerHTML = '<b></b><span></span>'; d.querySelector('b').textContent = b; d.querySelector('span').textContent = s; row.appendChild(d); });
+  setTxt('outroP', (nb.geH - t.geH > 0.05 ? L('Sans batterie, le groupe aurait tourné ' + hm(nb.geH) + ' au lieu de ' + hm(t.geH) + '. ', 'Without a battery, the genset would have run ' + hm(nb.geH) + ' instead of ' + hm(t.geH) + '. ') : nb.imp - t.imp > 0.05 ? L('Sans batterie, achat réseau de ' + fr(nb.imp, 1) + ' kWh au lieu de ' + fr(t.imp, 1) + '. ', 'Without a battery, grid import of ' + fr(nb.imp, 1) + ' kWh instead of ' + fr(t.imp, 1) + '. ') : '') + L('Simulation au pas d\'une minute, commandes validées sous Simulink.', 'One-minute step simulation, controls validated in Simulink.'));
+  $('outro').classList.add('on');
+}
+function filmStep(dt) {
+  filmT += dt;
+  if (filmPhase === 'intro') { if (filmT > 3.8) { $('intro').classList.remove('on'); filmPhase = 'run'; play(); } return 0; }
+  if (filmPhase !== 'run') return 0;
+  let idx = -1; EV.forEach((e, i) => { if (e.k <= state.k) idx = i; });
+  if (idx !== lastEvIdx && idx >= 0) {
+    lastEvIdx = idx; setTxt('capT', hhmm(EV[idx].k)); setTxt('capX', EV[idx].text);
+    $('cap').style.setProperty('--cc', EV[idx].col); $('cap').classList.add('on'); capUntil = filmT + 3;
+  }
+  if (filmT > capUntil) $('cap').classList.remove('on');
+  if (state.k >= N - 1) { $('cap').classList.remove('on'); outro(); return 0; }
+  return filmT < capUntil ? 0.22 : 1;
+}
+$('film').addEventListener('click', () => state.film ? exitFilm() : startFilm());
+$('outro').addEventListener('click', exitFilm);
+
+function applyLang() {
+  ROOT.dataset.lang = LANG; ROOT.lang = LANG;
+  document.title = L('Maison solaire en 24 heures', 'Solar house in 24 hours');
+  $('lgFr').setAttribute('aria-pressed', String(LANG === 'fr')); $('lgEn').setAttribute('aria-pressed', String(LANG === 'en'));
+  const o = $('season').options; o[0].textContent = L('Décembre, jour moyen (PVGIS)', 'December, average day (PVGIS)'); o[1].textContent = L('Juillet, ciel clair (modèle recalé)', 'July, clear sky (rescaled model)');
+  $('speed').setAttribute('aria-label', L('Vitesse', 'Speed'));
+  presetTexts(); syncInputs(); setTxt('playTxt', state.playing ? 'Pause' : L('Lecture', 'Play'));
+  recompute(); window.dispatchEvent(new Event('langchange'));
+}
+const setLang = l => { if (l === LANG) return; LANG = l; try { localStorage.setItem('pvsim-lang', l); } catch (e) {} applyLang(); };
+$('lgFr').addEventListener('click', () => setLang('fr'));
+$('lgEn').addEventListener('click', () => setLang('en'));
+
+function sizeAll() { PVC = fitCanvas($('pvc'), 150); SCP = fitCanvas($('scope'), 120); CH = fitCanvas($('chart'), state.film ? 190 : 250); base = null; }
+let last = performance.now(), acc = 0, tReal = 0;
+function frame(now) {
+  const raw = Math.max(0, (now - last) / 1000), dt = Math.min(0.1, raw); last = now; tReal += dt;
+  const slow = state.film ? filmStep(Math.min(0.5, raw)) : 1;
+  if (state.playing) {
+    acc += dt * state.speed * 60 * slow;
+    const step = Math.floor(acc); acc -= step;
+    if (step) { state.k = Math.min(N - 1, state.k + step); render(state.k); syncLive(); if (state.k >= N - 1 && !state.film) pause(); }
+  }
+  animateFlows(state.k, dt);
+  const cl = Math.max(state.cloud, R.cloudEv[state.k]);
+  CLOUDS.forEach(c => { if (!reduceMotion) c.x += c.v * dt * (0.5 + cl); if (c.x > 1060) c.x = -60; c.g.setAttribute('transform', 'translate(' + c.x.toFixed(1) + ',' + c.y.toFixed(1) + ')'); c.g.setAttribute('opacity', (cl > c.th * 0.85 + 0.04 ? Math.min(0.95, 0.45 + cl) : 0).toFixed(2)); });
+  const on = R.ge[state.k] > 0;
+  PUFFS.forEach(p => { if (!reduceMotion) p.t = (p.t + dt * 0.5) % 1; p.c.setAttribute('cx', (10 + 12 * p.t).toFixed(1)); p.c.setAttribute('cy', (-24 - 34 * p.t).toFixed(1)); p.c.setAttribute('r', (3 + 6 * p.t).toFixed(1)); p.c.setAttribute('opacity', on ? (0.7 * (1 - p.t)).toFixed(2) : 0); });
+  drawPV(state.k, tReal); drawScope(state.k, tReal);
+  requestAnimationFrame(frame);
+}
+window.addEventListener('resize', () => { sizeAll(); render(state.k); });
+readPal(); sizeAll(); presetTexts(); applyPreset(PRESETS[0]); state.k = 780; applyLang(); render(state.k); syncLive();
+if (document.fonts) document.fonts.ready.then(() => { base = null; render(state.k); });
+requestAnimationFrame(frame);
+})();
+</script>
+<script src="simulink_data.js"></script>
+<script>
+(() => {
+'use strict';
+if (!window.SIM) return;
+const S = window.SIM;
+const lang = () => document.documentElement.dataset.lang === 'en' ? 'en-US' : 'fr-FR';
+const fr = (x, d) => x.toLocaleString(lang(), { minimumFractionDigits: d, maximumFractionDigits: d });
+const col = (rows, i) => rows.filter(r => r[i] !== null).map(r => [r[0], r[i]]);
+const stepify = rows => { const o = []; rows.forEach((r, k) => { if (k) o.push([r[0], rows[k - 1][1]]); o.push(r); }); o.push([0.5, rows[rows.length - 1][1]]); return o; };
+const CH = [];
+const RMF = matchMedia('(prefers-reduced-motion: reduce)').matches;
+let T = {};
+const tok = () => { const cs = getComputedStyle(document.documentElement), g = n => cs.getPropertyValue('--' + n).trim(); T = { solar: g('solar'), battery: g('battery'), grid: g('grid'), genset: g('genset'), ink: g('ink'), ink2: g('ink-2'), muted: g('muted'), line: g('line'), line2: g('line-2') }; };
+const rgba = (h, a) => { if (!h || h[0] !== '#') return h; const c = [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16)); return 'rgba(' + c.join(',') + ',' + a + ')'; };
+const sc = s => s.a ? rgba(T[s.c], s.a) : T[s.c];
+function chart(id, cfg) {
+  const cv = document.getElementById(id); if (!cv) return;
+  const c = { cv, cfg, hover: null, prog: RMF || !('IntersectionObserver' in window) ? 1 : 0 };
+  CH.push(c);
+  cv.addEventListener('pointermove', e => { const r = cv.getBoundingClientRect(); c.hover = e.clientX - r.left; draw(c); });
+  cv.addEventListener('pointerleave', () => { c.hover = null; draw(c); });
+}
+function nearest(data, t) { let lo = 0, hi = data.length - 1; while (hi - lo > 1) { const m = (lo + hi) >> 1; data[m][0] < t ? lo = m : hi = m; } return Math.abs(data[lo][0] - t) < Math.abs(data[hi][0] - t) ? data[lo] : data[hi]; }
+function draw(c, sync) {
+  const { cv, cfg } = c, d = window.devicePixelRatio || 1, r = cv.getBoundingClientRect(), w = r.width, h = r.height;
+  cv.width = Math.round(w * d); cv.height = Math.round(h * d);
+  const x = cv.getContext('2d'); x.setTransform(d, 0, 0, d, 0, 0); x.clearRect(0, 0, w, h);
+  const l = 50, rr = cfg.y2 ? 48 : 12, t = 8, b = cfg.noX ? 8 : 22;
+  const X = v => l + (w - l - rr) * (v - cfg.x[0]) / (cfg.x[1] - cfg.x[0]);
+  const Y = (v, ax) => { const a = ax === 2 ? cfg.y2 : cfg.y; return t + (h - t - b) * (1 - (v - a[0]) / (a[1] - a[0])); };
+  x.font = '10px "B612 Mono", monospace'; x.lineWidth = 1;
+  cfg.y[2].forEach(v => { x.strokeStyle = T.line2; x.beginPath(); x.moveTo(l, Y(v)); x.lineTo(w - rr, Y(v)); x.stroke(); x.fillStyle = T.muted; x.textAlign = 'right'; x.fillText(fr(v, cfg.yd || 0) + ' ' + cfg.y[3], l - 5, Y(v) + 3); });
+  if (cfg.y2) cfg.y2[2].forEach(v => { x.fillStyle = T.muted; x.textAlign = 'left'; x.fillText(fr(v, 0) + ' ' + cfg.y2[3], w - rr + 5, Y(v, 2) + 3); });
+  if (!cfg.noX) { x.textAlign = 'center'; x.fillStyle = T.muted; cfg.xt.forEach(v => { x.fillText(fr(v, cfg.xd) + ' s', X(v), h - 6); x.strokeStyle = T.line2; x.beginPath(); x.moveTo(X(v), t); x.lineTo(X(v), h - b); x.stroke(); }); }
+  (cfg.refs || []).forEach(v => { x.strokeStyle = T.ink2; x.setLineDash([2, 3]); x.beginPath(); x.moveTo(l, Y(v)); x.lineTo(w - rr, Y(v)); x.stroke(); x.setLineDash([]); });
+  x.save(); x.beginPath(); x.rect(l, t, (w - l - rr) * (c.prog === undefined ? 1 : c.prog), h - t - b); x.clip();
+  cfg.series.forEach(s => {
+    x.beginPath(); let first = true;
+    for (const p of s.data) { if (p[0] < cfg.x[0] || p[0] > cfg.x[1]) continue; const px = X(p[0]), py = Y(p[1], s.ax); first ? x.moveTo(px, py) : x.lineTo(px, py); first = false; }
+    x.strokeStyle = sc(s); x.lineWidth = s.w || 1.5; x.setLineDash(s.dash || []); x.stroke(); x.setLineDash([]);
+  });
+  x.restore();
+  x.strokeStyle = T.line; x.beginPath(); x.moveTo(l, t); x.lineTo(l, h - b); x.lineTo(w - rr, h - b); x.stroke();
+  const out = document.getElementById('r_' + (cfg.readId || cv.id));
+  if (c.hover !== null && c.hover >= l && c.hover <= w - rr) {
+    const tv = cfg.x[0] + (c.hover - l) / (w - l - rr) * (cfg.x[1] - cfg.x[0]);
+    x.strokeStyle = T.ink2; x.beginPath(); x.moveTo(c.hover, t); x.lineTo(c.hover, h - b); x.stroke();
+    if (out && !sync) out.textContent = 't = ' + fr(tv, 4) + ' s, ' + cfg.series.filter(s => s.name).map(s => s.name + ' = ' + fr(nearest(s.data, tv)[1], s.d === undefined ? 1 : s.d) + ' ' + s.u).join(', ');
+    if (!sync) CH.filter(o => o !== c && cfg.readId && o.cfg.readId === cfg.readId).forEach(o => { o.hover = c.hover; draw(o, true); o.hover = null; });
+  } else if (!sync && c.hover === null) { CH.filter(o => o !== c && cfg.readId && o.cfg.readId === cfg.readId).forEach(o => draw(o, true)); if (out && !cfg.slave) out.textContent = lang() === 'en-US' ? 'Hover over the curve to read values.' : 'Survoler la courbe pour lire les valeurs.'; }
+}
+const X5 = [0, 0.5], XT = [0, 0.1, 0.2, 0.3, 0.4, 0.5];
+chart('c_pm', { x: X5, xt: XT, xd: 1, noX: true, y: [0, 4, [0, 2, 4], 'kW'], readId: 'c_vpv', slave: true,
+  series: [{ data: stepify(S.pm), c: 'solar', w: 2, name: 'P_pv', u: 'kW', d: 2 }] });
+chart('c_vpv', { x: X5, xt: XT, xd: 1, y: [210, 270, [220, 240, 260], 'V'], readId: 'c_vpv',
+  series: [{ data: col(S.vpv, 1), c: 'solar', a: .22, w: 1 }, { data: col(S.vpv, 2), c: 'solar', w: 2, name: 'V_pv (5 ms)', u: 'V' }, { data: col(S.vpv, 3), c: 'ink', w: 1.3, dash: [4, 3], name: 'V_ref', u: 'V' }] });
+chart('c_vdc', { x: X5, xt: XT, xd: 1, y: [388, 418, [390, 400, 410], 'V'], refs: [400],
+  series: [{ data: col(S.vdc, 1), c: 'ink', w: 1.6, name: 'V_dc', u: 'V' }] });
+chart('c_ibat', { x: X5, xt: XT, xd: 1, y: [-32, 4, [-30, -20, -10, 0], 'A'],
+  series: [{ data: col(S.ibat, 2), c: 'battery', a: .55, w: 1, name: 'I_bat', u: 'A' }, { data: col(S.ibat, 1), c: 'ink', w: 2, name: 'I*', u: 'A' }] });
+chart('c_pll', { x: [0, 0.2], xt: [0, 0.05, 0.1, 0.15, 0.2], xd: 2, noX: true, y: [-250, 400, [-200, 0, 200, 400], 'V'], readId: 'c_pll',
+  series: [{ data: col(S.pll, 1), c: 'ink', w: 1.8, name: 'v_d', u: 'V' }, { data: col(S.pll, 2), c: 'grid', w: 1.8, name: 'v_q', u: 'V' }] });
+chart('c_f', { x: [0, 0.2], xt: [0, 0.05, 0.1, 0.15, 0.2], xd: 2, y: [20, 65, [25, 50], 'Hz'], refs: [50], readId: 'c_pll', slave: true,
+  series: [{ data: col(S.pll, 3), c: 'genset', w: 1.8, name: 'f', u: 'Hz', d: 2 }] });
+chart('c_ig', { x: [0.40, 0.44], xt: [0.40, 0.41, 0.42, 0.43, 0.44], xd: 2, y: [-16, 16, [-15, -10, -5, 0, 5, 10, 15], 'A'], y2: [-400, 400, [-325, 0, 325], 'V'],
+  series: [{ data: col(S.vgig, 1), c: 'muted', w: 1.5, ax: 2, name: 'v_g', u: 'V', d: 0 }, { data: col(S.vgig, 2), c: 'grid', a: .32, w: 1, name: 'i_g', u: 'A' }, { data: col(S.vgig, 3), c: 'grid', w: 2.4, name: 'i_g (50 Hz)', u: 'A', d: 2 }] });
+const all = () => { tok(); CH.forEach(c => draw(c)); };
+if (!RMF && 'IntersectionObserver' in window) {
+  const io = new IntersectionObserver(es => es.forEach(e => {
+    if (!e.isIntersecting) return;
+    io.unobserve(e.target);
+    const c = CH.find(o => o.cv === e.target); if (!c) return;
+    let t0 = null;
+    const step = now => { if (t0 === null) t0 = now; c.prog = Math.min(1, (now - t0) / 1600); c.prog = 1 - Math.pow(1 - c.prog, 2); tok(); draw(c); if (now - t0 < 1600) requestAnimationFrame(step); else { c.prog = 1; draw(c); } };
+    requestAnimationFrame(step);
+  }), { threshold: 0.35 });
+  CH.forEach(c => io.observe(c.cv));
+}
+all(); window.addEventListener('resize', all); window.addEventListener('skymode', all); window.addEventListener('langchange', all);
+if (document.fonts) document.fonts.ready.then(all);
+})();
+</script>
+
+</body></html>
